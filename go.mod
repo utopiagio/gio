@@ -1,17 +1,17 @@
-module gioui.org
+module github.com/utopiagio/gio
 
-go 1.18
+go 1.19
 
 require (
-	eliasnaur.com/font v0.0.0-20220124212145-832bb8fc08c3
-	gioui.org/cpu v0.0.0-20210817075930-8d6a761490d2
+	eliasnaur.com/font v0.0.0-20220215125817-de715634c840
+	gioui.org v0.0.0-20230224004350-5f818bc5e7f9
+	gioui.org/cpu v0.0.0-20220412190645-f1e9e8c3b1f7
 	gioui.org/shader v1.0.6
 	github.com/benoitkugler/textlayout v0.3.0
-	github.com/go-text/typesetting v0.0.0-20221214153724-0399769901d5
-	golang.org/x/exp v0.0.0-20221012211006-4de253d81b95
-	golang.org/x/exp/shiny v0.0.0-20220827204233-334a2380cb91
-	golang.org/x/image v0.0.0-20220722155232-062f8c9fd539
-	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64
+	github.com/go-text/typesetting v0.0.0-20230212093906-959574cbf271
+	golang.org/x/exp v0.0.0-20230307190834-24139beb5833
+	golang.org/x/exp/shiny v0.0.0-20230307190834-24139beb5833
+	golang.org/x/image v0.6.0
+	golang.org/x/sys v0.6.0
+	golang.org/x/text v0.8.0
 )
-
-require golang.org/x/text v0.7.0
