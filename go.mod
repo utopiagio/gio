@@ -4,7 +4,6 @@ go 1.19
 
 require (
 	eliasnaur.com/font v0.0.0-20220215125817-de715634c840
-	gioui.org v0.0.0-20230224004350-5f818bc5e7f9
 	gioui.org/cpu v0.0.0-20220412190645-f1e9e8c3b1f7
 	gioui.org/shader v1.0.6
 	github.com/benoitkugler/textlayout v0.3.0

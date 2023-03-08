@@ -3,7 +3,7 @@
 package router
 
 import (
-	"gioui.org/io/event"
+	"github.com/utopiagio/gio/io/event"
 )
 
 type clipboardQueue struct {

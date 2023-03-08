@@ -8,14 +8,14 @@ import (
 	"math"
 	"testing"
 
-	"gioui.org/f32"
-	"gioui.org/font/gofont"
-	"gioui.org/gpu/headless"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
-	"gioui.org/widget/material"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/font/gofont"
+	"github.com/utopiagio/gio/gpu/headless"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gio/widget/material"
 )
 
 // use some global variables for benchmarking so as to not pollute

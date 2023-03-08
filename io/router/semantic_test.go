@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"testing"
 
-	"gioui.org/f32"
-	"gioui.org/io/pointer"
-	"gioui.org/io/semantic"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/semantic"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 func TestEmptySemantics(t *testing.T) {

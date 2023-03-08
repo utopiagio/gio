@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"math/bits"
 
-	"gioui.org/gesture"
-	"gioui.org/io/system"
-	"gioui.org/layout"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 // Decorations handles the states of window decorations.

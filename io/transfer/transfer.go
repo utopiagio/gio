@@ -20,9 +20,9 @@ package transfer
 import (
 	"io"
 
-	"gioui.org/internal/ops"
-	"gioui.org/io/event"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/op"
 )
 
 // SourceOp registers a tag as a data source for a MIME type.

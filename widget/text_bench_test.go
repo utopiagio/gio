@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"gioui.org/font/gofont"
-	"gioui.org/gpu/headless"
-	"gioui.org/io/system"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/text"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/font/gofont"
+	"github.com/utopiagio/gio/gpu/headless"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
 	"golang.org/x/exp/maps"
 )
 

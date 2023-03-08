@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"gioui.org/font/gofont"
-	"gioui.org/io/system"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/unit"
-	"gioui.org/widget"
-	"gioui.org/widget/material"
+	"github.com/utopiagio/gio/font/gofont"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gio/widget/material"
 )
 
 func TestListAnchorStrategies(t *testing.T) {

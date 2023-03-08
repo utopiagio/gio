@@ -11,7 +11,7 @@ import (
 	"errors"
 	"unsafe"
 
-	"gioui.org/internal/egl"
+	"github.com/utopiagio/gio/internal/egl"
 )
 
 /*

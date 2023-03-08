@@ -8,12 +8,12 @@ import (
 	"image"
 	"math"
 
-	"gioui.org/f32"
-	f32internal "gioui.org/internal/f32"
-	"gioui.org/internal/ops"
-	"gioui.org/internal/scene"
-	"gioui.org/internal/stroke"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/f32"
+	f32internal "github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/internal/scene"
+	"github.com/utopiagio/gio/internal/stroke"
+	"github.com/utopiagio/gio/op"
 )
 
 // Op represents a clip area. Op intersects the current clip area with

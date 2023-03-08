@@ -15,10 +15,10 @@ import (
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/unicode/bidi"
 
-	"gioui.org/f32"
-	"gioui.org/io/system"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 // document holds a collection of shaped lines and alignment information for

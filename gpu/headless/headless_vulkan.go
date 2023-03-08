@@ -9,8 +9,8 @@ package headless
 import (
 	"unsafe"
 
-	"gioui.org/gpu"
-	"gioui.org/internal/vk"
+	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gio/internal/vk"
 )
 
 type vkContext struct {

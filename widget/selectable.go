@@ -5,16 +5,16 @@ import (
 	"math"
 	"strings"
 
-	"gioui.org/gesture"
-	"gioui.org/io/clipboard"
-	"gioui.org/io/event"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/layout"
-	"gioui.org/op/clip"
-	"gioui.org/text"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/io/clipboard"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
 )
 
 // stringSource is an immutable textSource with a fixed string

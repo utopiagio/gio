@@ -3,9 +3,9 @@ package router
 import (
 	"testing"
 
-	"gioui.org/io/clipboard"
-	"gioui.org/io/event"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/io/clipboard"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/op"
 )
 
 func TestClipboardDuplicateEvent(t *testing.T) {

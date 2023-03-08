@@ -15,10 +15,10 @@ import (
 	"math"
 	"strings"
 
-	"gioui.org/f32"
-	"gioui.org/internal/ops"
-	"gioui.org/io/event"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/op"
 )
 
 // InputOp declares a handler ready for key events.

@@ -3,13 +3,13 @@ package widget
 import (
 	"io"
 
-	"gioui.org/f32"
-	"gioui.org/gesture"
-	"gioui.org/io/pointer"
-	"gioui.org/io/transfer"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/transfer"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 // Draggable makes a widget draggable.

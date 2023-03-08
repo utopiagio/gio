@@ -9,9 +9,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"gioui.org/io/system"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 	"github.com/go-text/typesetting/font"
 	"golang.org/x/image/math/fixed"
 )

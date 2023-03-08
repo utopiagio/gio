@@ -7,12 +7,12 @@ import (
 	"image"
 	"image/color"
 
-	"gioui.org/io/key"
+	"github.com/utopiagio/gio/io/key"
 
-	"gioui.org/gpu"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/unit"
 )
 
 // errOutOfDate is reported when the GPU surface dimensions or properties no

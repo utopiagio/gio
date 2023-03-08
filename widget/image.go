@@ -5,12 +5,12 @@ package widget
 import (
 	"image"
 
-	"gioui.org/f32"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gio/unit"
 )
 
 // Image is a widget that displays an image.

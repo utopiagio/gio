@@ -6,10 +6,10 @@ import (
 	"image"
 	"image/color"
 
-	"gioui.org/layout"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gio/unit"
 )
 
 // Border lays out a widget and draws a border inside it.

@@ -6,9 +6,9 @@ import (
 	"image"
 	"math"
 
-	"gioui.org/gesture"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 type scrollChild struct {

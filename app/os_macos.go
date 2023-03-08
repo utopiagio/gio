@@ -13,14 +13,14 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"gioui.org/internal/f32"
-	"gioui.org/io/clipboard"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gio/io/clipboard"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/unit"
 
-	_ "gioui.org/internal/cocoainit"
+	_ "github.com/utopiagio/gio/internal/cocoainit"
 )
 
 /*

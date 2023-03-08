@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"gioui.org/f32"
-	"gioui.org/io/event"
-	"gioui.org/io/pointer"
-	"gioui.org/io/router"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/router"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 func TestHover(t *testing.T) {

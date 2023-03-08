@@ -6,13 +6,13 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/gesture"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/semantic"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/semantic"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 // Clickable represents a clickable area.

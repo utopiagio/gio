@@ -5,12 +5,12 @@ import (
 	"image"
 	"testing"
 
-	"gioui.org/font/gofont"
-	"gioui.org/io/key"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/text"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/font/gofont"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
 )
 
 func TestSelectableZeroValue(t *testing.T) {

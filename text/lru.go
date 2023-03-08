@@ -6,8 +6,8 @@ import (
 	"encoding/binary"
 	"hash/maphash"
 
-	"gioui.org/io/system"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/op/clip"
 	"golang.org/x/image/math/fixed"
 )
 

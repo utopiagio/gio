@@ -5,9 +5,9 @@
 package profile
 
 import (
-	"gioui.org/internal/ops"
-	"gioui.org/io/event"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/op"
 )
 
 // Op registers a handler for receiving

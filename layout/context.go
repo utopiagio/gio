@@ -6,10 +6,10 @@ import (
 	"image"
 	"time"
 
-	"gioui.org/io/event"
-	"gioui.org/io/system"
-	"gioui.org/op"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/unit"
 )
 
 // Context carries the state needed by almost all layouts and widgets.

@@ -5,7 +5,7 @@ package text
 import (
 	"fmt"
 
-	"gioui.org/io/system"
+	"github.com/utopiagio/gio/io/system"
 	"github.com/go-text/typesetting/font"
 	"golang.org/x/image/math/fixed"
 )
