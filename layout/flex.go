@@ -24,10 +24,15 @@ type Flex struct {
 	WeightSum float32
 }
 
+// RNW Modified
+// hflex horizontal flex style. hflex=true->Flexed(hflex child) : hflex=false->Rigid(hflex child)
+// vflex vertical flex style. vflex=true->Flexed(vflex child) : vflex=false->Rigid(vflex child)
+// ********************************************
 // FlexChild is the descriptor for a Flex child.
 type FlexChild struct {
-	flex   bool
-	weight float32
+	hflex   bool
+	vflex	bool
+	weight 	float32
 
 	widget Widget
 
