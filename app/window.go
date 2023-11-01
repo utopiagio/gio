@@ -155,6 +155,7 @@ func NewWindow(options ...Option) *Window {
 	dims := decoStyle.Layout(gtx)
 	decoHeight := unit.Dp(dims.Size.Y)
 	defaultOptions := []Option{
+		Pos(-1, -1), // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
 		Size(800, 600),
 		Title("Gio"),
 		Decorated(true),
@@ -1090,6 +1091,23 @@ func (q *queue) Events(k event.Tag) []event.Event {
 func Title(t string) Option {
 	return func(_ unit.Metric, cnf *Config) {
 		cnf.Title = t
+	}
+}
+
+// Pos sets the position of the window. The mode will be changed to Windowed.
+func Pos(x, y unit.Dp) Option {
+	/*if w <= 0 {
+		panic("width must be larger than or equal to 0")
+	}
+	if h <= 0 {
+		panic("height must be larger than or equal to 0")
+	}*/
+	return func(m unit.Metric, cnf *Config) {
+		cnf.Mode = Windowed
+		cnf.Pos = image.Point{
+			X: m.Dp(x),
+			Y: m.Dp(y),
+		}
 	}
 }
 

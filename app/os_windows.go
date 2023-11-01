@@ -680,11 +680,24 @@ func (w *window) Configure(options []Option) {
 		windows.SetWindowText(w.hwnd, w.config.Title)
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
-		// Get target for client areaa size.
+		// *******************************************************************
+		// Get target for client area position.
+		posX := int32(w.config.Pos.X) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		posY := int32(w.config.Pos.Y) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		// *******************************************************************
+		// Get target for client area size.
 		width = int32(w.config.Size.X)
 		height = int32(w.config.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
+		// *******************************************************************
+		if posX > -1 {   // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+			wr.Left = posX
+		}
+		if posY > -1 {   // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+			wr.Top = posY
+		}
+		// *******************************************************************
 		// Set desired window size.
 		wr.Right = wr.Left + width
 		wr.Bottom = wr.Top + height

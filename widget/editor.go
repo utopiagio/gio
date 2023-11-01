@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"image"
 	"io"
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -190,6 +191,7 @@ func (e *Editor) Events() []EditorEvent {
 }
 
 func (e *Editor) processEvents(gtx layout.Context) {
+	log.Println("editor processEvents()")
 	// Flush events from before the previous Layout.
 	n := copy(e.events, e.events[e.prevEvents:])
 	e.events = e.events[:n]
@@ -273,6 +275,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 				fallthrough
 			case evt.Type == pointer.Drag && evt.Source == pointer.Mouse:
 				if e.dragging {
+
 					e.blinkStart = gtx.Now
 					e.text.MoveCoord(image.Point{
 						X: int(math.Round(float64(evt.Position.X))),

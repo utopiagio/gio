@@ -3,7 +3,7 @@ module github.com/utopiagio/gio
 go 1.19
 
 require (
-	eliasnaur.com/font v0.0.0-20220215125817-de715634c840
+	eliasnaur.com/font v0.0.0-20230308162249-dd43949cb42d
 	gioui.org/cpu v0.0.0-20220412190645-f1e9e8c3b1f7
 	gioui.org/shader v1.0.6
 	github.com/benoitkugler/textlayout v0.3.0
