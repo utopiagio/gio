@@ -5,13 +5,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/utopiagio/gio/font/gofont"
+	//"github.com/utopiagio/gio/font/gofont"
 	"github.com/utopiagio/gio/io/system"
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/unit"
 	"github.com/utopiagio/gio/widget"
 	"github.com/utopiagio/gio/widget/material"
+
+	//"gioui.org/io/system"
+	//"gioui.org/layout"
+	//"gioui.org/op"
+	//"gioui.org/unit"
+	//"gioui.org/widget"
+	//"gioui.org/widget/material"
 )
 
 func TestListAnchorStrategies(t *testing.T) {
@@ -45,7 +52,7 @@ func TestListAnchorStrategies(t *testing.T) {
 	var list widget.List
 	list.Axis = layout.Vertical
 	elements := 100
-	th := material.NewTheme(gofont.Collection())
+	th := material.NewTheme()
 	materialList := material.List(th, &list)
 	indicatorWidth := gtx.Dp(materialList.Width())
 

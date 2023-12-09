@@ -1,17 +1,25 @@
 package text
 
 import (
+	"fmt"
 	"math"
 	"reflect"
+	"strconv"
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
+	"github.com/go-text/typesetting/font"
 	"github.com/go-text/typesetting/shaping"
+	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
 	"github.com/utopiagio/gio/font/opentype"
 	"github.com/utopiagio/gio/io/system"
+
+	giofont "github.com/utopiagio/gio/font"
+	//"github.com/utopiagio/gio/font/opentype"
+	//"github.com/utopiagio/gio/io/system"
 )
 
 var english = system.Locale{
@@ -24,12 +32,13 @@ var arabic = system.Locale{
 	Direction: system.RTL,
 }
 
-func testShaper(faces ...Face) *shaperImpl {
-	shaper := shaperImpl{}
+func testShaper(faces ...giofont.Face) *shaperImpl {
+	ff := make([]FontFace, 0, len(faces))
 	for _, face := range faces {
-		shaper.Load(FontFace{Face: face})
+		ff = append(ff, FontFace{Face: face})
 	}
-	return &shaper
+	shaper := newShaperImpl(false, ff)
+	return shaper
 }
 
 func TestEmptyString(t *testing.T) {
@@ -37,22 +46,33 @@ func TestEmptyString(t *testing.T) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	shaper := testShaper(ltrFace)
 
-	lines := shaper.LayoutRunes(Parameters{PxPerEm: ppem}, 0, 2000, english, []rune{})
+	lines := shaper.LayoutRunes(Parameters{
+		PxPerEm:  ppem,
+		MaxWidth: 2000,
+		Locale:   english,
+	}, []rune{})
 	if len(lines.lines) == 0 {
 		t.Fatalf("Layout returned no lines for empty string; expected 1")
 	}
 	l := lines.lines[0]
-	exp := fixed.Rectangle26_6{
-		Min: fixed.Point26_6{
-			Y: fixed.Int26_6(-12094),
-		},
-		Max: fixed.Point26_6{
-			Y: fixed.Int26_6(2700),
-		},
+	if expected := fixed.Int26_6(12094); l.ascent != expected {
+		t.Errorf("unexpected ascent for empty string: %v, expected %v", l.ascent, expected)
 	}
-	if got := l.bounds; got != exp {
-		t.Errorf("got bounds %+v for empty string; expected %+v", got, exp)
+	if expected := fixed.Int26_6(2700); l.descent != expected {
+		t.Errorf("unexpected descent for empty string: %v, expected %v", l.descent, expected)
 	}
+}
+
+func TestNoFaces(t *testing.T) {
+	ppem := fixed.I(200)
+	shaper := testShaper()
+
+	// Ensure shaping text with no faces does not panic.
+	shaper.LayoutRunes(Parameters{
+		PxPerEm:  ppem,
+		MaxWidth: 2000,
+		Locale:   english,
+	}, []rune("✨ⷽℎ↞⋇ⱜ⪫⢡⽛⣦␆Ⱨⳏ⳯⒛⭣╎⌞⟻⢇┃➡⬎⩱⸇ⷎ⟅▤⼶⇺⩳⎏⤬⬞ⴈ⋠⿶⢒₍☟⽂ⶦ⫰⭢⌹∼▀⾯⧂❽⩏ⓖ⟅⤔⍇␋⽓ₑ⢳⠑❂⊪⢘⽨⃯▴ⷿ"))
 }
 
 func TestAlignWidth(t *testing.T) {
@@ -110,7 +130,11 @@ func TestShapingAlignWidth(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			lines := shaper.LayoutString(Parameters{PxPerEm: ppem}, tc.minWidth, tc.maxWidth, english, tc.str)
+			lines := shaper.LayoutString(Parameters{PxPerEm: ppem,
+				MinWidth: tc.minWidth,
+				MaxWidth: tc.maxWidth,
+				Locale:   english,
+			}, tc.str)
 			if lines.alignWidth != tc.expected {
 				t.Errorf("expected line alignWidth to be %d, got %d", tc.expected, lines.alignWidth)
 			}
@@ -155,7 +179,11 @@ func TestNewlineSynthesis(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 
-			doc := shaper.LayoutRunes(Parameters{PxPerEm: ppem}, 0, 200, tc.locale, []rune(tc.txt))
+			doc := shaper.LayoutRunes(Parameters{
+				PxPerEm:  ppem,
+				MaxWidth: 200,
+				Locale:   tc.locale,
+			}, []rune(tc.txt))
 			for lineIdx, line := range doc.lines {
 				lastRunIdx := len(line.runs) - 1
 				lastRun := line.runs[lastRunIdx]
@@ -219,6 +247,21 @@ func complexGlyph(cluster, runes, glyphs int) shaping.Glyph {
 	}
 }
 
+// copyLines performs a deep copy of the provided lines. This is necessary if you
+// want to use the line wrapper again while also using the lines.
+func copyLines(lines []shaping.Line) []shaping.Line {
+	out := make([]shaping.Line, len(lines))
+	for lineIdx, line := range lines {
+		lineCopy := make([]shaping.Output, len(line))
+		for runIdx, run := range line {
+			lineCopy[runIdx] = run
+			lineCopy[runIdx].Glyphs = slices.Clone(run.Glyphs)
+		}
+		out[lineIdx] = lineCopy
+	}
+	return out
+}
+
 // makeTestText creates a simple and complex(bidi) sample of shaped text at the given
 // font size and wrapped to the given line width. The runeLimit, if nonzero,
 // truncates the sample text to ensure shorter output for expensive tests.
@@ -256,9 +299,19 @@ func makeTestText(shaper *shaperImpl, primaryDir system.TextDirection, fontSize,
 			rtlSource = string(complexRunes[:runeLimit])
 		}
 	}
-	simpleText := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(simpleSource))
-	complexText := shaper.shapeAndWrapText(shaper.orderer.sortedFacesForStyle(Font{}), Parameters{PxPerEm: fixed.I(fontSize)}, lineWidth, locale, []rune(complexSource))
-	shaper = testShaper(rtlFace, ltrFace)
+	simpleText, _ := shaper.shapeAndWrapText(Parameters{
+		PxPerEm:  fixed.I(fontSize),
+		MaxWidth: lineWidth,
+		Locale:   locale,
+	}, []rune(simpleSource))
+	simpleText = copyLines(simpleText)
+	complexText, _ := shaper.shapeAndWrapText(Parameters{
+		PxPerEm:  fixed.I(fontSize),
+		MaxWidth: lineWidth,
+		Locale:   locale,
+	}, []rune(complexSource))
+	complexText = copyLines(complexText)
+	testShaper(rtlFace, ltrFace)
 	return simpleText, complexText
 }
 
@@ -336,13 +389,7 @@ func TestToLine(t *testing.T) {
 					totalInputGlyphs += len(run.Glyphs)
 					totalInputRunes += run.Runes.Count
 				}
-				output := toLine(&shaper.orderer, input, tc.dir)
-				if output.bounds.Min == (fixed.Point26_6{}) {
-					t.Errorf("line %d: Bounds.Min not populated", i)
-				}
-				if output.bounds.Max == (fixed.Point26_6{}) {
-					t.Errorf("line %d: Bounds.Max not populated", i)
-				}
+				output := toLine(shaper.faceToIndex, input, tc.dir)
 				if output.direction != tc.dir {
 					t.Errorf("line %d: expected direction %v, got %v", i, tc.dir, output.direction)
 				}
@@ -523,10 +570,10 @@ func TestComputeVisualOrder(t *testing.T) {
 func FuzzLayout(f *testing.F) {
 	ltrFace, _ := opentype.Parse(goregular.TTF)
 	rtlFace, _ := opentype.Parse(nsareg.TTF)
-	f.Add("د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.", true, uint8(10), uint16(200))
+	f.Add("د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.", true, false, uint8(10), uint16(200))
 
 	shaper := testShaper(ltrFace, rtlFace)
-	f.Fuzz(func(t *testing.T, txt string, rtl bool, fontSize uint8, width uint16) {
+	f.Fuzz(func(t *testing.T, txt string, rtl bool, truncate bool, fontSize uint8, width uint16) {
 		locale := system.Locale{
 			Direction: system.LTR,
 		}
@@ -536,7 +583,16 @@ func FuzzLayout(f *testing.F) {
 		if fontSize < 1 {
 			fontSize = 1
 		}
-		lines := shaper.LayoutRunes(Parameters{PxPerEm: fixed.I(int(fontSize))}, 0, int(width), locale, []rune(txt))
+		maxLines := 0
+		if truncate {
+			maxLines = 1
+		}
+		lines := shaper.LayoutRunes(Parameters{
+			PxPerEm:  fixed.I(int(fontSize)),
+			MaxWidth: int(width),
+			MaxLines: maxLines,
+			Locale:   locale,
+		}, []rune(txt))
 		validateLines(t, lines.lines, len([]rune(txt)))
 	})
 }
@@ -545,12 +601,6 @@ func validateLines(t *testing.T, lines []line, expectedRuneCount int) {
 	t.Helper()
 	runesSeen := 0
 	for i, line := range lines {
-		if line.bounds.Min == (fixed.Point26_6{}) {
-			t.Errorf("line %d: Bounds.Min not populated", i)
-		}
-		if line.bounds.Max == (fixed.Point26_6{}) {
-			t.Errorf("line %d: Bounds.Max not populated", i)
-		}
 		totalRunWidth := fixed.I(0)
 		totalLineGlyphs := 0
 		lineRunesSeen := 0
@@ -595,11 +645,15 @@ func TestTextAppend(t *testing.T) {
 	shaper := testShaper(ltrFace, rtlFace)
 
 	text1 := shaper.LayoutString(Parameters{
-		PxPerEm: fixed.I(14),
-	}, 0, 200, english, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
+		PxPerEm:  fixed.I(14),
+		MaxWidth: 200,
+		Locale:   english,
+	}, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
 	text2 := shaper.LayoutString(Parameters{
-		PxPerEm: fixed.I(14),
-	}, 0, 200, english, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
+		PxPerEm:  fixed.I(14),
+		MaxWidth: 200,
+		Locale:   english,
+	}, "د عرمثال dstي met لم aqل جدmوpمg lرe dرd  لو عل ميrةsdiduntut lab renنيتذدagلaaiua.ئPocttأior رادرsاي mيrbلmnonaيdتد ماةعcلخ.")
 
 	text1.append(text2)
 	curY := math.MinInt
@@ -612,102 +666,49 @@ func TestTextAppend(t *testing.T) {
 	}
 }
 
-func TestClosestFontByWeight(t *testing.T) {
-	const (
-		testTF1 Typeface = "MockFace"
-		testTF2 Typeface = "TestFace"
-		testTF3 Typeface = "AnotherFace"
-	)
-	fonts := []Font{
-		{Typeface: testTF1, Style: Regular, Weight: Normal},
-		{Typeface: testTF1, Style: Regular, Weight: Light},
-		{Typeface: testTF1, Style: Regular, Weight: Bold},
-		{Typeface: testTF1, Style: Italic, Weight: Thin},
+func TestGlyphIDPacking(t *testing.T) {
+	const maxPPem = fixed.Int26_6((1 << sizebits) - 1)
+	type testcase struct {
+		name      string
+		ppem      fixed.Int26_6
+		faceIndex int
+		gid       font.GID
+		expected  GlyphID
 	}
-	weightOnlyTests := []struct {
-		Lookup   Weight
-		Expected Weight
-	}{
-		// Test for existing weights.
-		{Lookup: Normal, Expected: Normal},
-		{Lookup: Light, Expected: Light},
-		{Lookup: Bold, Expected: Bold},
-		// Test for missing weights.
-		{Lookup: Thin, Expected: Light},
-		{Lookup: ExtraLight, Expected: Light},
-		{Lookup: Medium, Expected: Normal},
-		{Lookup: SemiBold, Expected: Bold},
-		{Lookup: ExtraBlack, Expected: Bold},
-	}
-	for _, test := range weightOnlyTests {
-		got, ok := closestFont(Font{Typeface: testTF1, Weight: test.Lookup}, fonts)
-		if !ok {
-			t.Errorf("expected closest font for %v to exist", test.Lookup)
-		}
-		if got.Weight != test.Expected {
-			t.Errorf("got weight %v, expected %v", got.Weight, test.Expected)
-		}
-	}
-	fonts = []Font{
-		{Typeface: testTF1, Style: Regular, Weight: Light},
-		{Typeface: testTF1, Style: Regular, Weight: Bold},
-		{Typeface: testTF1, Style: Italic, Weight: Normal},
-		{Typeface: testTF3, Style: Italic, Weight: Bold},
-	}
-	otherTests := []struct {
-		Lookup         Font
-		Expected       Font
-		ExpectedToFail bool
-	}{
-		// Test for existing fonts.
+	for _, tc := range []testcase{
 		{
-			Lookup:   Font{Typeface: testTF1, Weight: Light},
-			Expected: Font{Typeface: testTF1, Style: Regular, Weight: Light},
+			name: "zero value",
 		},
 		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-		},
-		// Test for missing fonts.
-		{
-			Lookup:   Font{Typeface: testTF1, Weight: Normal},
-			Expected: Font{Typeface: testTF1, Style: Regular, Weight: Light},
+			name:      "10 ppem faceIdx 1 GID 5",
+			ppem:      fixed.I(10),
+			faceIndex: 1,
+			gid:       5,
+			expected:  284223755780101,
 		},
 		{
-			Lookup:   Font{Typeface: testTF3, Style: Italic, Weight: Normal},
-			Expected: Font{Typeface: testTF3, Style: Italic, Weight: Bold},
+			name:      maxPPem.String() + " ppem faceIdx " + strconv.Itoa(math.MaxUint16) + " GID " + fmt.Sprintf("%d", int64(math.MaxUint32)),
+			ppem:      maxPPem,
+			faceIndex: math.MaxUint16,
+			gid:       math.MaxUint32,
+			expected:  18446744073709551615,
 		},
-		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Thin},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-		},
-		{
-			Lookup:   Font{Typeface: testTF1, Style: Italic, Weight: Bold},
-			Expected: Font{Typeface: testTF1, Style: Italic, Weight: Normal},
-		},
-		{
-			Lookup:         Font{Typeface: testTF2, Weight: Normal},
-			ExpectedToFail: true,
-		},
-		{
-			Lookup:         Font{Typeface: testTF2, Style: Italic, Weight: Normal},
-			ExpectedToFail: true,
-		},
-	}
-	for _, test := range otherTests {
-		got, ok := closestFont(test.Lookup, fonts)
-		if test.ExpectedToFail {
-			if ok {
-				t.Errorf("expected closest font for %v to not exist", test.Lookup)
-			} else {
-				continue
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := newGlyphID(tc.ppem, tc.faceIndex, tc.gid)
+			if actual != tc.expected {
+				t.Errorf("expected %d, got %d", tc.expected, actual)
 			}
-		}
-		if !ok {
-			t.Errorf("expected closest font for %v to exist", test.Lookup)
-		}
-		if got != test.Expected {
-			t.Errorf("got %v, expected %v", got, test.Expected)
-		}
+			actualPPEM, actualFaceIdx, actualGID := splitGlyphID(actual)
+			if actualPPEM != tc.ppem {
+				t.Errorf("expected ppem %d, got %d", tc.ppem, actualPPEM)
+			}
+			if actualFaceIdx != tc.faceIndex {
+				t.Errorf("expected faceIdx %d, got %d", tc.faceIndex, actualFaceIdx)
+			}
+			if actualGID != tc.gid {
+				t.Errorf("expected gid %d, got %d", tc.gid, actualGID)
+			}
+		})
 	}
 }

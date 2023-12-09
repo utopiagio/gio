@@ -16,6 +16,16 @@ import (
 	"github.com/utopiagio/gio/op/clip"
 	"github.com/utopiagio/gio/op/paint"
 	"github.com/utopiagio/gio/widget/material"
+
+	//"gioui.org/f32"
+	//"gioui.org/font/gofont"
+	//"gioui.org/gpu/headless"
+	//"gioui.org/layout"
+	//"gioui.org/op"
+	//"gioui.org/op/clip"
+	//"gioui.org/op/paint"
+	"github.com/utopiagio/gio/text"
+	//"gioui.org/widget/material"
 )
 
 // use some global variables for benchmarking so as to not pollute
@@ -33,7 +43,8 @@ func setupBenchmark(b *testing.B) (layout.Context, *headless.Window, *material.T
 		Ops:         ops,
 		Constraints: layout.Exact(sz),
 	}
-	th := material.NewTheme(gofont.Collection())
+	th := material.NewTheme()
+	th.Shaper = text.NewShaper(text.WithCollection(gofont.Collection()))
 	return gtx, w, th
 }
 

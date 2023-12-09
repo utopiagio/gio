@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+
 	"github.com/utopiagio/gio/f32"
 	"github.com/utopiagio/gio/gesture"
 	"github.com/utopiagio/gio/io/event"
@@ -17,6 +18,16 @@ import (
 	"github.com/utopiagio/gio/io/transfer"
 	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/op/clip"
+
+	//"gioui.org/f32"
+	//"gioui.org/gesture"
+	//"gioui.org/io/event"
+	//"gioui.org/io/key"
+	//"gioui.org/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	//"gioui.org/io/transfer"
+	//"gioui.org/op"
+	//"gioui.org/op/clip"
 )
 
 func TestPointerWakeup(t *testing.T) {
@@ -32,11 +43,6 @@ func TestPointerWakeup(t *testing.T) {
 	}
 	// However, adding a handler queues a Cancel event.
 	assertEventPointerTypeSequence(t, r.Events(handler), pointer.Cancel)
-	// Verify that r.Events does trigger a redraw.
-	r.Frame(&ops)
-	if _, wake := r.WakeupTime(); !wake {
-		t.Errorf("pointer.Cancel event didn't trigger a redraw")
-	}
 }
 
 func TestPointerDrag(t *testing.T) {
@@ -49,12 +55,12 @@ func TestPointerDrag(t *testing.T) {
 	r.Queue(
 		// Press.
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 		// Move outside the area.
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(150, 150),
 		},
 	)
@@ -71,12 +77,12 @@ func TestPointerDragNegative(t *testing.T) {
 	r.Queue(
 		// Press.
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(-50, -50),
 		},
 		// Move outside the area.
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(-150, -150),
 		},
 	)
@@ -91,15 +97,15 @@ func TestPointerGrab(t *testing.T) {
 
 	types := pointer.Press | pointer.Release
 
-	pointer.InputOp{Tag: handler1, Types: types, Grab: true}.Add(&ops)
-	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
-	pointer.InputOp{Tag: handler3, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types, Grab: true}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Kinds: types}.Add(&ops)
+	pointer.InputOp{Tag: handler3, Kinds: types}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -109,7 +115,7 @@ func TestPointerGrab(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -125,15 +131,15 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 
 	types := pointer.Press | pointer.Release
 
-	pointer.InputOp{Tag: handler1, Types: types, Grab: true}.Add(&ops)
-	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
-	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types, Grab: true}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Kinds: types}.Add(&ops)
 
 	var r Router
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -142,7 +148,7 @@ func TestPointerGrabSameHandlerTwice(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -159,10 +165,10 @@ func TestPointerMove(t *testing.T) {
 
 	// Handler 1 area: (0, 0) - (100, 100)
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
-	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types}.Add(&ops)
 	// Handler 2 area: (50, 50) - (100, 100) (areas intersect).
 	r2 := clip.Rect(image.Rect(50, 50, 200, 200)).Push(&ops)
-	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Kinds: types}.Add(&ops)
 	r2.Pop()
 	r1.Pop()
 
@@ -171,21 +177,21 @@ func TestPointerMove(t *testing.T) {
 	r.Queue(
 		// Hit both handlers.
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(50, 50),
 		},
 		// Hit handler 1.
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(49, 50),
 		},
 		// Hit no handlers.
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(100, 50),
 		},
 		pointer.Event{
-			Type: pointer.Cancel,
+			Kind: pointer.Cancel,
 		},
 	)
 	assertEventPointerTypeSequence(t, r.Events(handler1), pointer.Cancel, pointer.Enter, pointer.Move, pointer.Move, pointer.Leave, pointer.Cancel)
@@ -198,7 +204,7 @@ func TestPointerTypes(t *testing.T) {
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{
 		Tag:   handler,
-		Types: pointer.Press | pointer.Release,
+		Kinds: pointer.Press | pointer.Release,
 	}.Add(&ops)
 	r1.Pop()
 
@@ -206,19 +212,56 @@ func TestPointerTypes(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(150, 150),
 		},
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(150, 150),
 		},
 	)
 	assertEventPointerTypeSequence(t, r.Events(handler), pointer.Cancel, pointer.Press, pointer.Release)
+}
+
+func TestPointerSystemAction(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		var ops op.Ops
+		r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionMove).Add(&ops)
+		r1.Pop()
+
+		var r Router
+		r.Frame(&ops)
+		assertActionAt(t, r, f32.Pt(50, 50), system.ActionMove)
+	})
+	t.Run("covered by another clip", func(t *testing.T) {
+		var ops op.Ops
+		r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionMove).Add(&ops)
+		clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
+		r1.Pop()
+
+		var r Router
+		r.Frame(&ops)
+		assertActionAt(t, r, f32.Pt(50, 50), system.ActionMove)
+	})
+	t.Run("uses topmost action op", func(t *testing.T) {
+		var ops op.Ops
+		r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionMove).Add(&ops)
+		r2 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
+		system.ActionInputOp(system.ActionClose).Add(&ops)
+		r2.Pop()
+		r1.Pop()
+
+		var r Router
+		r.Frame(&ops)
+		assertActionAt(t, r, f32.Pt(50, 50), system.ActionClose)
+	})
 }
 
 func TestPointerPriority(t *testing.T) {
@@ -230,14 +273,14 @@ func TestPointerPriority(t *testing.T) {
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
 	pointer.InputOp{
 		Tag:          handler1,
-		Types:        pointer.Scroll,
+		Kinds:        pointer.Scroll,
 		ScrollBounds: image.Rectangle{Max: image.Point{X: 100}},
 	}.Add(&ops)
 
 	r2 := clip.Rect(image.Rect(0, 0, 100, 50)).Push(&ops)
 	pointer.InputOp{
 		Tag:          handler2,
-		Types:        pointer.Scroll,
+		Kinds:        pointer.Scroll,
 		ScrollBounds: image.Rectangle{Max: image.Point{X: 20}},
 	}.Add(&ops)
 	r2.Pop()
@@ -246,7 +289,7 @@ func TestPointerPriority(t *testing.T) {
 	r3 := clip.Rect(image.Rect(0, 100, 100, 200)).Push(&ops)
 	pointer.InputOp{
 		Tag:          handler3,
-		Types:        pointer.Scroll,
+		Kinds:        pointer.Scroll,
 		ScrollBounds: image.Rectangle{Min: image.Point{X: -20, Y: -40}},
 	}.Add(&ops)
 	r3.Pop()
@@ -256,25 +299,25 @@ func TestPointerPriority(t *testing.T) {
 	r.Queue(
 		// Hit handler 1 and 2.
 		pointer.Event{
-			Type:     pointer.Scroll,
+			Kind:     pointer.Scroll,
 			Position: f32.Pt(50, 25),
 			Scroll:   f32.Pt(50, 0),
 		},
 		// Hit handler 1.
 		pointer.Event{
-			Type:     pointer.Scroll,
+			Kind:     pointer.Scroll,
 			Position: f32.Pt(50, 75),
 			Scroll:   f32.Pt(50, 50),
 		},
 		// Hit handler 3.
 		pointer.Event{
-			Type:     pointer.Scroll,
+			Kind:     pointer.Scroll,
 			Position: f32.Pt(50, 150),
 			Scroll:   f32.Pt(-30, -30),
 		},
 		// Hit no handlers.
 		pointer.Event{
-			Type:     pointer.Scroll,
+			Kind:     pointer.Scroll,
 			Position: f32.Pt(50, 225),
 		},
 	)
@@ -310,7 +353,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Hit both handlers.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -323,7 +366,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Leave the second area by moving into the first.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(45, 45),
 		},
 	)
@@ -334,7 +377,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Move, but stay within the same hit area.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(40, 40),
 		},
 	)
@@ -344,7 +387,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Move outside of both inputs.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(300, 300),
 		},
 	)
@@ -354,7 +397,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Check that a Press event generates Enter Events.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(125, 125),
 		},
 	)
@@ -365,12 +408,12 @@ func TestPointerEnterLeave(t *testing.T) {
 	r.Queue(
 		// Leave
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(25, 25),
 		},
 		// Enter
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -380,7 +423,7 @@ func TestPointerEnterLeave(t *testing.T) {
 	// Check that a Release event generates Enter/Leave Events.
 	r.Queue(
 		pointer.Event{
-			Type: pointer.Release,
+			Kind: pointer.Release,
 			Position: f32.Pt(25,
 				25),
 		},
@@ -408,15 +451,15 @@ func TestMultipleAreas(t *testing.T) {
 	// Hit first area, then second area, then both.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(25, 25),
 		},
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(150, 150),
 		},
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -432,11 +475,11 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 
 	// Handler 1 area: (0, 0) - (100, 100)
 	r1 := clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops)
-	pointer.InputOp{Tag: handler1, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler1, Kinds: types}.Add(&ops)
 
 	// Handler 2 area: (25, 25) - (75, 75) (nested within first).
 	r2 := clip.Rect(image.Rect(25, 25, 75, 75)).Push(&ops)
-	pointer.InputOp{Tag: handler2, Types: types}.Add(&ops)
+	pointer.InputOp{Tag: handler2, Kinds: types}.Add(&ops)
 	r2.Pop()
 	r1.Pop()
 
@@ -445,7 +488,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Hit both handlers.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -457,7 +500,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Leave the second area by moving into the first.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(20, 20),
 		},
 	)
@@ -467,7 +510,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Move, but stay within the same hit area.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(10, 10),
 		},
 	)
@@ -477,7 +520,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Move outside of both inputs.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(200, 200),
 		},
 	)
@@ -487,7 +530,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Check that a Press event generates Enter Events.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 			Position: f32.Pt(50, 50),
 		},
 	)
@@ -497,7 +540,7 @@ func TestPointerEnterLeaveNested(t *testing.T) {
 	// Check that a Release event generates Enter/Leave Events.
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Release,
+			Kind:     pointer.Release,
 			Position: f32.Pt(20, 20),
 		},
 	)
@@ -516,7 +559,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(25, 25),
 		},
 	)
@@ -527,7 +570,7 @@ func TestPointerActiveInputDisappears(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Position: f32.Pt(25, 25),
 		},
 	)
@@ -549,21 +592,21 @@ func TestMultitouch(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type:      pointer.Press,
+			Kind:      pointer.Press,
 			Position:  h1pt,
 			PointerID: p1,
 		},
 	)
 	r.Queue(
 		pointer.Event{
-			Type:      pointer.Press,
+			Kind:      pointer.Press,
 			Position:  h2pt,
 			PointerID: p2,
 		},
 	)
 	r.Queue(
 		pointer.Event{
-			Type:      pointer.Release,
+			Kind:      pointer.Release,
 			Position:  h2pt,
 			PointerID: p2,
 		},
@@ -596,7 +639,7 @@ func TestCursor(t *testing.T) {
 
 	_at := func(x, y float32) pointer.Event {
 		return pointer.Event{
-			Type:     pointer.Move,
+			Kind:     pointer.Move,
 			Source:   pointer.Mouse,
 			Buttons:  pointer.ButtonPrimary,
 			Position: f32.Pt(x, y),
@@ -696,14 +739,14 @@ func TestPassOp(t *testing.T) {
 	h1, h2, h3, h4 := new(int), new(int), new(int), new(int)
 	area := clip.Rect(image.Rect(0, 0, 100, 100))
 	root := area.Push(&ops)
-	pointer.InputOp{Tag: h1, Types: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h1, Kinds: pointer.Press}.Add(&ops)
 	child1 := area.Push(&ops)
-	pointer.InputOp{Tag: h2, Types: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h2, Kinds: pointer.Press}.Add(&ops)
 	child1.Pop()
 	child2 := area.Push(&ops)
 	pass := pointer.PassOp{}.Push(&ops)
-	pointer.InputOp{Tag: h3, Types: pointer.Press}.Add(&ops)
-	pointer.InputOp{Tag: h4, Types: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h3, Kinds: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h4, Kinds: pointer.Press}.Add(&ops)
 	pass.Pop()
 	child2.Pop()
 	root.Pop()
@@ -712,7 +755,7 @@ func TestPassOp(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type: pointer.Press,
+			Kind: pointer.Press,
 		},
 	)
 	assertEventPointerTypeSequence(t, r.Events(h1), pointer.Cancel, pointer.Press)
@@ -725,13 +768,13 @@ func TestAreaPassthrough(t *testing.T) {
 	var ops op.Ops
 
 	h := new(int)
-	pointer.InputOp{Tag: h, Types: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h, Kinds: pointer.Press}.Add(&ops)
 	clip.Rect(image.Rect(0, 0, 100, 100)).Push(&ops).Pop()
 	var r Router
 	r.Frame(&ops)
 	r.Queue(
 		pointer.Event{
-			Type: pointer.Press,
+			Kind: pointer.Press,
 		},
 	)
 	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press)
@@ -742,7 +785,7 @@ func TestEllipse(t *testing.T) {
 
 	h := new(int)
 	cl := clip.Ellipse(image.Rect(0, 0, 100, 100)).Push(&ops)
-	pointer.InputOp{Tag: h, Types: pointer.Press}.Add(&ops)
+	pointer.InputOp{Tag: h, Kinds: pointer.Press}.Add(&ops)
 	cl.Pop()
 	var r Router
 	r.Frame(&ops)
@@ -750,15 +793,15 @@ func TestEllipse(t *testing.T) {
 		// Outside ellipse.
 		pointer.Event{
 			Position: f32.Pt(10, 10),
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 		},
 		pointer.Event{
-			Type: pointer.Release,
+			Kind: pointer.Release,
 		},
 		// Inside ellipse.
 		pointer.Event{
 			Position: f32.Pt(50, 50),
-			Type:     pointer.Press,
+			Kind:     pointer.Press,
 		},
 	)
 	assertEventPointerTypeSequence(t, r.Events(h), pointer.Cancel, pointer.Press)
@@ -787,7 +830,7 @@ func TestTransfer(t *testing.T) {
 		return src, tgt
 	}
 	// Cancel is received when the pointer is first seen.
-	cancel := pointer.Event{Type: pointer.Cancel}
+	cancel := pointer.Event{Kind: pointer.Cancel}
 
 	t.Run("transfer.Offer should panic on nil Data", func(t *testing.T) {
 		defer func() {
@@ -807,11 +850,11 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 		)
 		assertEventSequence(t, r.Events(src), cancel)
@@ -821,11 +864,11 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(30, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 			pointer.Event{
 				Position: f32.Pt(30, 10),
-				Type:     pointer.Release,
+				Kind:     pointer.Release,
 			},
 		)
 		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
@@ -848,11 +891,11 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 		)
 		assertEventSequence(t, r.Events(src), cancel)
@@ -869,11 +912,11 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 		)
 		assertEventSequence(t, r.Events(src), cancel)
@@ -883,7 +926,7 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Release,
+				Kind:     pointer.Release,
 			},
 		)
 		assertEventSequence(t, r.Events(src), transfer.CancelEvent{})
@@ -906,11 +949,11 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 		)
 		assertEventSequence(t, r.Events(src), cancel)
@@ -920,7 +963,7 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Release,
+				Kind:     pointer.Release,
 			},
 		)
 		assertEventSequence(t, r.Events(src), transfer.RequestEvent{Type: "file"})
@@ -973,15 +1016,15 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Release,
+				Kind:     pointer.Release,
 			},
 		)
 		ofr := &offer{data: "hello"}
@@ -1016,15 +1059,15 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 		)
 		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel, pointer.Enter)
@@ -1033,7 +1076,7 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Release,
+				Kind:     pointer.Release,
 			},
 		)
 
@@ -1064,15 +1107,15 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Press,
+				Kind:     pointer.Press,
 			},
 			pointer.Event{
 				Position: f32.Pt(10, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Move,
+				Kind:     pointer.Move,
 			},
 		)
 		assertEventPointerTypeSequence(t, r.Events(&hover), pointer.Cancel)
@@ -1081,7 +1124,7 @@ func TestTransfer(t *testing.T) {
 		r.Queue(
 			pointer.Event{
 				Position: f32.Pt(40, 10),
-				Type:     pointer.Release,
+				Kind:     pointer.Release,
 			},
 		)
 
@@ -1129,7 +1172,7 @@ func TestPassCursor(t *testing.T) {
 	r.Frame(&ops)
 	r.Queue(pointer.Event{
 		Position: f32.Pt(10, 10),
-		Type:     pointer.Move,
+		Kind:     pointer.Move,
 	})
 	if got := r.Cursor(); want != got {
 		t.Errorf("got cursor %v, want %v", got, want)
@@ -1154,18 +1197,18 @@ func addPointerHandler(ops *op.Ops, tag event.Tag, area image.Rectangle) {
 	defer clip.Rect(area).Push(ops).Pop()
 	pointer.InputOp{
 		Tag:   tag,
-		Types: pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
+		Kinds: pointer.Press | pointer.Release | pointer.Move | pointer.Drag | pointer.Enter | pointer.Leave,
 	}.Add(ops)
 }
 
 // pointerTypes converts a sequence of event.Event to their pointer.Types. It assumes
 // that all input events are of underlying type pointer.Event, and thus will
 // panic if some are not.
-func pointerTypes(events []event.Event) []pointer.Type {
-	var types []pointer.Type
+func pointerTypes(events []event.Event) []pointer.Kind {
+	var types []pointer.Kind
 	for _, e := range events {
 		if e, ok := e.(pointer.Event); ok {
-			types = append(types, e.Type)
+			types = append(types, e.Kind)
 		}
 	}
 	return types
@@ -1173,7 +1216,7 @@ func pointerTypes(events []event.Event) []pointer.Type {
 
 // assertEventPointerTypeSequence checks that the provided events match the expected pointer event types
 // in the provided order.
-func assertEventPointerTypeSequence(t *testing.T, events []event.Event, expected ...pointer.Type) {
+func assertEventPointerTypeSequence(t *testing.T, events []event.Event, expected ...pointer.Kind) {
 	t.Helper()
 	got := pointerTypes(events)
 	if !reflect.DeepEqual(got, expected) {
@@ -1201,7 +1244,7 @@ func eventsToString(evs []event.Event) string {
 	for _, ev := range evs {
 		switch e := ev.(type) {
 		case pointer.Event:
-			s = append(s, fmt.Sprintf("%T{%s}", e, e.Type.String()))
+			s = append(s, fmt.Sprintf("%T{%s}", e, e.Kind.String()))
 		default:
 			s = append(s, fmt.Sprintf("{%T}", e))
 		}
@@ -1228,6 +1271,17 @@ func assertScrollEvent(t *testing.T, ev event.Event, scroll f32.Point) {
 	t.Helper()
 	if got, want := ev.(pointer.Event).Scroll, scroll; got != want {
 		t.Errorf("got %v; want %v", got, want)
+	}
+}
+
+// assertActionAt checks that the router has a system action of the expected type at point.
+func assertActionAt(t *testing.T, q Router, point f32.Point, expected system.Action) {
+	t.Helper()
+	action, ok := q.ActionAt(point)
+	if !ok {
+		t.Errorf("expected action %v at %v, got no action", expected, point)
+	} else if action != expected {
+		t.Errorf("expected action %v at %v, got %v", expected, point, action)
 	}
 }
 
@@ -1259,7 +1313,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 					Push(&ops)
 				pointer.InputOp{
 					Tag:   handlers[i],
-					Types: pointer.Move,
+					Kinds: pointer.Move,
 				}.Add(&ops)
 			}
 			var r Router
@@ -1269,7 +1323,7 @@ func BenchmarkRouterAdd(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				r.Queue(
 					pointer.Event{
-						Type:     pointer.Move,
+						Kind:     pointer.Move,
 						Position: f32.Pt(50, 50),
 					},
 				)

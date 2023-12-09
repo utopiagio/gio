@@ -14,7 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/font/opentype"
+	//"github.com/utopiagio/gio/font/opentype"
 	"github.com/utopiagio/gio/gpu"
 	"github.com/utopiagio/gio/internal/ops"
 	"github.com/utopiagio/gio/io/event"
@@ -29,7 +29,25 @@ import (
 	"github.com/utopiagio/gio/unit"
 	"github.com/utopiagio/gio/widget"
 	"github.com/utopiagio/gio/widget/material"
-	"golang.org/x/image/font/gofont/goregular"
+	//"golang.org/x/image/font/gofont/goregular"
+
+	//"gioui.org/f32"
+	"github.com/utopiagio/gio/font/gofont"
+	//"gioui.org/gpu"
+	"github.com/utopiagio/gio/internal/debug"
+	//"gioui.org/internal/ops"
+	//"gioui.org/io/event"
+	//"gioui.org/io/key"
+	//"gioui.org/io/pointer"
+	//"gioui.org/io/profile"
+	//"gioui.org/io/router"
+	//"gioui.org/io/system"
+	//"gioui.org/layout"
+	//"gioui.org/op"
+	//"gioui.org/text"
+	//"gioui.org/unit"
+	//"gioui.org/widget"
+	//"gioui.org/widget/material"
 
 	_ "github.com/utopiagio/gio/app/internal/log"
 )
@@ -61,12 +79,12 @@ type Window struct {
 	// actions are the actions waiting to be performed.
 	actions chan system.Action
 
+	// out is where the platform backend delivers events bound for the
+	// user program.
 	out      chan event.Event
 	frames   chan *op.Ops
 	frameAck chan struct{}
 	destroy  chan struct{}
-	// dead is closed when the window is destroyed.
-	dead chan struct{}
 
 	stage        system.Stage
 	animating    bool
@@ -109,6 +127,16 @@ type Window struct {
 	}
 
 	imeState editorState
+
+	// event stores the state required for processing and delivering events
+	// from NextEvent. If we had support for range over func, this would
+	// be the iterator state.
+	eventState struct {
+		created     bool
+		initialOpts []Option
+		wakeup      func()
+		timer       *time.Timer
+	}
 }
 
 type editorState struct {
@@ -140,10 +168,11 @@ type queue struct {
 // Calling NewWindow more than once is not supported on
 // iOS, Android, WebAssembly.
 func NewWindow(options ...Option) *Window {
+	debug.Parse()
 	// Measure decoration height.
 	deco := new(widget.Decorations)
-	face, _ := opentype.Parse(goregular.TTF)
-	theme := material.NewTheme([]text.FontFace{{Font: text.Font{Typeface: "Go"}, Face: face}})
+	theme := material.NewTheme()
+	theme.Shaper = text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Regular()))
 	decoStyle := material.Decorations(theme, deco, 0, "")
 	gtx := layout.Context{
 		Ops: new(op.Ops),
@@ -176,7 +205,6 @@ func NewWindow(options ...Option) *Window {
 		wakeups:          make(chan struct{}, 1),
 		wakeupFuncs:      make(chan func()),
 		destroy:          make(chan struct{}),
-		dead:             make(chan struct{}),
 		options:          make(chan []Option, 1),
 		actions:          make(chan system.Action, 1),
 		nocontext:        cnf.CustomRenderer,
@@ -188,7 +216,7 @@ func NewWindow(options ...Option) *Window {
 	w.imeState.compose = key.Range{Start: -1, End: -1}
 	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
 	w.callbacks.w = w
-	go w.run(options)
+	w.eventState.initialOpts = options
 	return w
 }
 
@@ -196,11 +224,6 @@ func decoHeightOpt(h unit.Dp) Option {
 	return func(m unit.Metric, c *Config) {
 		c.decoHeight = h
 	}
-}
-
-// Events returns the channel where events are delivered.
-func (w *Window) Events() <-chan event.Event {
-	return w.out
 }
 
 // update the window contents, input operations declare input handlers,
@@ -382,15 +405,6 @@ func (w *Window) Option(opts ...Option) {
 	}
 }
 
-// ReadClipboard initiates a read of the clipboard in the form
-// of a clipboard.Event. Multiple reads may be coalesced
-// to a single event.
-func (w *Window) ReadClipboard() {
-	w.driverDefer(func(d driver) {
-		d.ReadClipboard()
-	})
-}
-
 // WriteClipboard writes a string to the clipboard.
 func (w *Window) WriteClipboard(s string) {
 	w.driverDefer(func(d driver) {
@@ -414,7 +428,7 @@ func (w *Window) Run(f func()) {
 	})
 	select {
 	case <-done:
-	case <-w.dead:
+	case <-w.destroy:
 	}
 }
 
@@ -424,7 +438,7 @@ func (w *Window) driverDefer(f func(d driver)) {
 	select {
 	case w.driverFuncs <- f:
 		w.wakeup()
-	case <-w.dead:
+	case <-w.destroy:
 	}
 }
 
@@ -489,7 +503,7 @@ func (c *callbacks) Event(e event.Event) bool {
 	}
 	c.busy = false
 	select {
-	case <-c.w.dead:
+	case <-c.w.destroy:
 		return handled
 	default:
 	}
@@ -605,8 +619,6 @@ func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
 		dist := v.Mul(int(w.metric.Dp(scrollABit)))
 		w.queue.q.ScrollFocus(dist)
 	}
-	w.setNextFrame(time.Time{})
-	w.updateAnimation(d)
 }
 
 func (c *callbacks) ClickFocus() {
@@ -727,7 +739,7 @@ func (w *Window) waitAck(d driver) {
 		select {
 		case f := <-w.driverFuncs:
 			f(d)
-		case w.out <- event.Event(nil):
+		case w.out <- theFlushEvent:
 			// A dummy event went through, so we know the application has processed the previous event.
 			return
 		case <-w.immediateRedraws:
@@ -761,7 +773,7 @@ func (w *Window) waitFrame(d driver) *op.Ops {
 		case frame := <-w.frames:
 			// The client called FrameEvent.Frame.
 			return frame
-		case w.out <- event.Event(nil):
+		case w.out <- theFlushEvent:
 			// The client ignored FrameEvent and continued processing
 			// events.
 			return nil
@@ -824,7 +836,7 @@ func (w *Window) updateState(d driver) {
 
 func (w *Window) processEvent(d driver, e event.Event) bool {
 	select {
-	case <-w.dead:
+	case <-w.destroy:
 		return false
 	default:
 	}
@@ -895,8 +907,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		if err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal); err != nil {
 			w.destroyGPU()
 			w.out <- system.DestroyEvent{Err: err}
-			close(w.out)
-			w.destroy <- struct{}{}
+			close(w.destroy)
 			break
 		}
 		w.processFrame(d, frameStart)
@@ -904,8 +915,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	case system.DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
-		close(w.out)
-		w.destroy <- struct{}{}
+		close(w.destroy)
 	case ViewEvent:
 		w.out <- e2
 		w.waitAck(d)
@@ -915,78 +925,88 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 	case event.Event:
 		handled := w.queue.q.Queue(e2)
+		if e, ok := e.(key.Event); ok && !handled {
+			if e.State == key.Press {
+				handled = true
+				isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
+				switch {
+				case e.Name == key.NameTab && e.Modifiers == 0:
+					w.moveFocus(router.FocusForward, d)
+				case e.Name == key.NameTab && e.Modifiers == key.ModShift:
+					w.moveFocus(router.FocusBackward, d)
+				case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusUp, d)
+				case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusDown, d)
+				case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusLeft, d)
+				case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
+					w.moveFocus(router.FocusRight, d)
+				default:
+					handled = false
+				}
+			}
+			// As a special case, the top-most input handler receives all unhandled
+			// events.
+			if !handled {
+				handled = w.queue.q.QueueTopmost(e)
+			}
+		}
+		w.updateCursor(d)
 		if handled {
 			w.setNextFrame(time.Time{})
 			w.updateAnimation(d)
-		} else if e, ok := e.(key.Event); ok && e.State == key.Press {
-			handled = true
-			isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
-			switch {
-			case e.Name == key.NameTab && e.Modifiers == 0:
-				w.moveFocus(router.FocusForward, d)
-			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
-				w.moveFocus(router.FocusBackward, d)
-			case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusUp, d)
-			case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusDown, d)
-			case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusLeft, d)
-			case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
-				w.moveFocus(router.FocusRight, d)
-			default:
-				handled = false
-			}
 		}
-		// As a sepcial case, the top-most input handler receives all unhandled
-		// events.
-		if e, ok := e.(key.Event); ok && !handled {
-			handled = w.queue.q.QueueTopmost(e)
-		}
-		w.updateCursor(d)
 		return handled
 	}
 	return true
 }
 
-func (w *Window) run(options []Option) {
-	if err := newWindow(&w.callbacks, options); err != nil {
-		w.out <- system.DestroyEvent{Err: err}
-		close(w.out)
-		w.destroy <- struct{}{}
-		return
+// NextEvent blocks until an event is received from the window, such as
+// [io/system.FrameEvent]. It blocks forever if called after [io/system.DestroyEvent]
+// has been returned.
+func (w *Window) NextEvent() event.Event {
+	state := &w.eventState
+	if !state.created {
+		state.created = true
+		if err := newWindow(&w.callbacks, state.initialOpts); err != nil {
+			close(w.destroy)
+			return system.DestroyEvent{Err: err}
+		}
 	}
-	var wakeup func()
-	var timer *time.Timer
 	for {
 		var (
 			wakeups <-chan struct{}
 			timeC   <-chan time.Time
 		)
-		if wakeup != nil {
+		if state.wakeup != nil {
 			wakeups = w.wakeups
-			if timer != nil {
-				timeC = timer.C
+			if state.timer != nil {
+				timeC = state.timer.C
 			}
 		}
 		select {
 		case t := <-w.scheduledRedraws:
-			if timer != nil {
-				timer.Stop()
+			if state.timer != nil {
+				state.timer.Stop()
 			}
-			timer = time.NewTimer(time.Until(t))
-		case <-w.destroy:
-			close(w.dead)
-			return
+			state.timer = time.NewTimer(time.Until(t))
+		case e := <-w.out:
+			// Receiving a flushEvent indicates to the platform backend that
+			// all previous events have been processed by the user program.
+			if _, ok := e.(flushEvent); ok {
+				break
+			}
+			return e
 		case <-timeC:
 			select {
 			case w.redraws <- struct{}{}:
-				wakeup()
+				state.wakeup()
 			default:
 			}
 		case <-wakeups:
-			wakeup()
-		case wakeup = <-w.wakeupFuncs:
+			state.wakeup()
+		case state.wakeup = <-w.wakeupFuncs:
 		}
 	}
 }
@@ -1036,7 +1056,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	}
 	style.Layout(gtx)
 	// Update the window based on the actions on the decorations.
-	w.Perform(deco.Actions())
+	w.Perform(deco.Update(gtx))
 	// Offset to place the frame content below the decorations.
 	decoHeight := gtx.Dp(w.decorations.Config.decoHeight)
 	if w.decorations.currentHeight != decoHeight {
@@ -1194,3 +1214,14 @@ func Decorated(enabled bool) Option {
 		cnf.Decorated = enabled
 	}
 }
+
+// flushEvent is sent to detect when the user program
+// has completed processing of all prior events. Its an
+// [io/event.Event] but only for internal use.
+type flushEvent struct{}
+
+func (t flushEvent) ImplementsEvent() {}
+
+// theFlushEvent avoids allocating garbage when sending
+// flushEvents.
+var theFlushEvent flushEvent

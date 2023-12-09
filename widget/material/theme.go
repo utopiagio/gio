@@ -10,6 +10,11 @@ import (
 	"github.com/utopiagio/gio/text"
 	"github.com/utopiagio/gio/unit"
 	"github.com/utopiagio/gio/widget"
+
+	"github.com/utopiagio/gio/font"
+	//"gioui.org/text"
+	//"gioui.org/unit"
+	//"gioui.org/widget"
 )
 
 // Palette contains the minimal set of colors that a widget may need to
@@ -41,15 +46,16 @@ type Theme struct {
 		RadioChecked      *widget.Icon
 		RadioUnchecked    *widget.Icon
 	}
+	// Face selects the default typeface for text.
+	Face font.Typeface
 
 	// FingerSize is the minimum touch target size.
 	FingerSize unit.Dp
 }
 
-func NewTheme(fontCollection []text.FontFace) *Theme {
-	t := &Theme{
-		Shaper: text.NewShaper(fontCollection),
-	}
+// NewTheme constructs a theme (and underlying text shaper).
+func NewTheme() *Theme {
+	t := &Theme{Shaper: &text.Shaper{}}
 	t.Palette = Palette{
 		Fg:         rgb(0x000000),
 		Bg:         rgb(0xffffff),

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"image"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"os/exec"
@@ -792,7 +791,7 @@ func gio_onTouchDown(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Press,
+		Kind:      pointer.Press,
 		Source:    pointer.Touch,
 		Position:  w.lastTouch,
 		PointerID: pointer.ID(id),
@@ -808,7 +807,7 @@ func gio_onTouchUp(data unsafe.Pointer, touch *C.struct_wl_touch, serial, t C.ui
 	w := s.touchFoci[id]
 	delete(s.touchFoci, id)
 	w.w.Event(pointer.Event{
-		Type:      pointer.Release,
+		Kind:      pointer.Release,
 		Source:    pointer.Touch,
 		Position:  w.lastTouch,
 		PointerID: pointer.ID(id),
@@ -826,7 +825,7 @@ func gio_onTouchMotion(data unsafe.Pointer, touch *C.struct_wl_touch, t C.uint32
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Move,
+		Kind:      pointer.Move,
 		Position:  w.lastTouch,
 		Source:    pointer.Touch,
 		PointerID: pointer.ID(id),
@@ -845,7 +844,7 @@ func gio_onTouchCancel(data unsafe.Pointer, touch *C.struct_wl_touch) {
 	for id, w := range s.touchFoci {
 		delete(s.touchFoci, id)
 		w.w.Event(pointer.Event{
-			Type:   pointer.Cancel,
+			Kind:   pointer.Cancel,
 			Source: pointer.Touch,
 		})
 	}
@@ -870,7 +869,7 @@ func gio_onPointerLeave(data unsafe.Pointer, p *C.struct_wl_pointer, serial C.ui
 	s.serial = serial
 	if w.inCompositor {
 		w.inCompositor = false
-		w.w.Event(pointer.Event{Type: pointer.Cancel})
+		w.w.Event(pointer.Event{Kind: pointer.Cancel})
 	}
 }
 
@@ -904,18 +903,7 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 	default:
 		return
 	}
-	var typ pointer.Type
-	switch state {
-	case 0:
-		w.pointerBtns &^= btn
-		typ = pointer.Release
-		// Move or resize gestures no longer applies.
-		w.inCompositor = false
-	case 1:
-		w.pointerBtns |= btn
-		typ = pointer.Press
-	}
-	if typ == pointer.Press && btn == pointer.ButtonPrimary {
+	if state == 1 && btn == pointer.ButtonPrimary {
 		if _, edge := w.systemGesture(); edge != 0 {
 			w.resize(serial, edge)
 			return
@@ -929,10 +917,21 @@ func gio_onPointerButton(data unsafe.Pointer, p *C.struct_wl_pointer, serial, t,
 			}
 		}
 	}
+	var kind pointer.Kind
+	switch state {
+	case 0:
+		w.pointerBtns &^= btn
+		kind = pointer.Release
+		// Move or resize gestures no longer applies.
+		w.inCompositor = false
+	case 1:
+		w.pointerBtns |= btn
+		kind = pointer.Press
+	}
 	w.flushScroll()
 	w.resetFling()
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    pointer.Mouse,
 		Buttons:   w.pointerBtns,
 		Position:  w.lastPos,
@@ -954,7 +953,12 @@ func gio_onPointerAxis(data unsafe.Pointer, p *C.struct_wl_pointer, t, axis C.ui
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
 		w.scroll.dist.X += v
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.scroll.dist.Y += v
+		// horizontal scroll if shift + mousewheel(up/down) pressed.
+		if w.disp.xkb.Modifiers() == key.ModShift {
+			w.scroll.dist.X += v
+		} else {
+			w.scroll.dist.Y += v
+		}
 	}
 }
 
@@ -1004,7 +1008,12 @@ func gio_onPointerAxisDiscrete(data unsafe.Pointer, p *C.struct_wl_pointer, axis
 	case C.WL_POINTER_AXIS_HORIZONTAL_SCROLL:
 		w.scroll.steps.X += int(discrete)
 	case C.WL_POINTER_AXIS_VERTICAL_SCROLL:
-		w.scroll.steps.Y += int(discrete)
+		// horizontal scroll if shift + mousewheel(up/down) pressed.
+		if w.disp.xkb.Modifiers() == key.ModShift {
+			w.scroll.steps.X += int(discrete)
+		} else {
+			w.scroll.steps.Y += int(discrete)
+		}
 	}
 }
 
@@ -1018,7 +1027,7 @@ func (w *window) ReadClipboard() {
 	// Don't let slow clipboard transfers block event loop.
 	go func() {
 		defer r.Close()
-		data, _ := ioutil.ReadAll(r)
+		data, _ := io.ReadAll(r)
 		w.clipReads <- clipboard.Event{Text: string(data)}
 		w.Wakeup()
 	}()
@@ -1564,7 +1573,7 @@ func (w *window) flushScroll() {
 		return
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Scroll,
+		Kind:      pointer.Scroll,
 		Source:    pointer.Mouse,
 		Buttons:   w.pointerBtns,
 		Position:  w.lastPos,
@@ -1587,7 +1596,7 @@ func (w *window) onPointerMotion(x, y C.wl_fixed_t, t C.uint32_t) {
 		Y: fromFixed(y) * float32(w.scale),
 	}
 	w.w.Event(pointer.Event{
-		Type:      pointer.Move,
+		Kind:      pointer.Move,
 		Position:  w.lastPos,
 		Buttons:   w.pointerBtns,
 		Source:    pointer.Mouse,

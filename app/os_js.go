@@ -22,7 +22,9 @@ import (
 	"github.com/utopiagio/gio/unit"
 )
 
-type ViewEvent struct{}
+type ViewEvent struct {
+	Element js.Value
+}
 
 type contextStatus int
 
@@ -111,6 +113,7 @@ func newWindow(win *callbacks, options []Option) error {
 		w.w.SetDriver(w)
 		w.Configure(options)
 		w.blur()
+		w.w.Event(ViewEvent{Element: cont})
 		w.w.Event(system.StageEvent{Stage: system.StageRunning})
 		w.resize()
 		w.draw(true)
@@ -233,6 +236,10 @@ func (w *window) addEventListeners() {
 	w.addEventListener(w.cnv, "wheel", func(this js.Value, args []js.Value) interface{} {
 		e := args[0]
 		dx, dy := e.Get("deltaX").Float(), e.Get("deltaY").Float()
+		// horizontal scroll if shift is pressed.
+		if e.Get("shiftKey").Bool() {
+			dx, dy = dy, dx
+		}
 		mode := e.Get("deltaMode").Int()
 		switch mode {
 		case 0x01: // DOM_DELTA_LINE
@@ -268,7 +275,7 @@ func (w *window) addEventListeners() {
 		}
 		w.touches = w.touches[:0]
 		w.w.Event(pointer.Event{
-			Type:   pointer.Cancel,
+			Kind:   pointer.Cancel,
 			Source: pointer.Touch,
 		})
 		return nil
@@ -351,6 +358,8 @@ func (w *window) keyboard(hint key.InputHint) {
 		m = "url"
 	case key.HintTelephone:
 		m = "tel"
+	case key.HintPassword:
+		m = "password"
 	default:
 		m = "text"
 	}
@@ -389,7 +398,7 @@ func modifiersFor(e js.Value) key.Modifiers {
 	return mods
 }
 
-func (w *window) touchEvent(typ pointer.Type, e js.Value) {
+func (w *window) touchEvent(kind pointer.Kind, e js.Value) {
 	e.Call("preventDefault")
 	t := time.Duration(e.Get("timeStamp").Int()) * time.Millisecond
 	changedTouches := e.Get("changedTouches")
@@ -417,7 +426,7 @@ func (w *window) touchEvent(typ pointer.Type, e js.Value) {
 			Y: float32(y) * scale,
 		}
 		w.w.Event(pointer.Event{
-			Type:      typ,
+			Kind:      kind,
 			Source:    pointer.Touch,
 			Position:  pos,
 			PointerID: pid,
@@ -439,7 +448,7 @@ func (w *window) touchIDFor(touch js.Value) pointer.ID {
 	return pid
 }
 
-func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
+func (w *window) pointerEvent(kind pointer.Kind, dx, dy float32, e js.Value) {
 	e.Call("preventDefault")
 	x, y := e.Get("clientX").Float(), e.Get("clientY").Float()
 	rect := w.cnv.Call("getBoundingClientRect")
@@ -467,7 +476,7 @@ func (w *window) pointerEvent(typ pointer.Type, dx, dy float32, e js.Value) {
 		btns |= pointer.ButtonTertiary
 	}
 	w.w.Event(pointer.Event{
-		Type:      typ,
+		Kind:      kind,
 		Source:    pointer.Mouse,
 		Buttons:   btns,
 		Position:  pos,

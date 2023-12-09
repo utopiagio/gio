@@ -25,6 +25,21 @@ import (
 	"github.com/utopiagio/gio/op/clip"
 	"github.com/utopiagio/gio/text"
 	"github.com/utopiagio/gio/unit"
+
+	//"gioui.org/f32"
+	"github.com/utopiagio/gio/font"
+	//"gioui.org/gesture"
+	//"gioui.org/io/clipboard"
+	//"gioui.org/io/event"
+	//"gioui.org/io/key"
+	//"gioui.org/io/pointer"
+	"github.com/utopiagio/gio/io/semantic"
+	//"gioui.org/io/system"
+	//"gioui.org/layout"
+	//"gioui.org/op"
+	//"gioui.org/op/clip"
+	//"gioui.org/text"
+	//"gioui.org/unit"
 )
 
 // Editor implements an editable and scrollable text area.
@@ -34,6 +49,12 @@ type Editor struct {
 	text textView
 	// Alignment controls the alignment of text within the editor.
 	Alignment text.Alignment
+	// LineHeight determines the gap between baselines of text. If zero, a sensible
+	// default will be used.
+	LineHeight unit.Sp
+	// LineHeightScale is multiplied by LineHeight to determine the final gap
+	// between baselines. If zero, a sensible default will be used.
+	LineHeightScale float32
 	// SingleLine force the text to stay on a single line.
 	// SingleLine also sets the scrolling direction to
 	// horizontal.
@@ -56,6 +77,8 @@ type Editor struct {
 	// Filter is the list of characters allowed in the Editor. If Filter is empty,
 	// all characters are allowed.
 	Filter string
+	// WrapPolicy configures how displayed text will be broken into lines.
+	WrapPolicy text.WrapPolicy
 
 	buffer *editBuffer
 	// scratch is a byte buffer that is reused to efficiently read portions of text
@@ -217,7 +240,7 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		axis = gesture.Vertical
 		smin, smax = sbounds.Min.Y, sbounds.Max.Y
 	}
-	sdist := e.scroller.Scroll(gtx.Metric, gtx, gtx.Now, axis)
+	sdist := e.scroller.Update(gtx.Metric, gtx, gtx.Now, axis)
 	var soff int
 	if e.SingleLine {
 		e.text.ScrollRel(sdist, 0)
@@ -230,8 +253,8 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		switch evt := evt.(type) {
 		case gesture.ClickEvent:
 			switch {
-			case evt.Type == gesture.TypePress && evt.Source == pointer.Mouse,
-				evt.Type == gesture.TypeClick && evt.Source != pointer.Mouse:
+			case evt.Kind == gesture.KindPress && evt.Source == pointer.Mouse,
+				evt.Kind == gesture.KindClick && evt.Source != pointer.Mouse:
 				prevCaretPos, _ := e.text.Selection()
 				e.blinkStart = gtx.Now
 				e.text.MoveCoord(image.Point{
@@ -270,10 +293,10 @@ func (e *Editor) processPointer(gtx layout.Context) {
 		case pointer.Event:
 			release := false
 			switch {
-			case evt.Type == pointer.Release && evt.Source == pointer.Mouse:
+			case evt.Kind == pointer.Release && evt.Source == pointer.Mouse:
 				release = true
 				fallthrough
-			case evt.Type == pointer.Drag && evt.Source == pointer.Mouse:
+			case evt.Kind == pointer.Drag && evt.Source == pointer.Mouse:
 				if e.dragging {
 
 					e.blinkStart = gtx.Now
@@ -298,10 +321,10 @@ func (e *Editor) processPointer(gtx layout.Context) {
 
 func (e *Editor) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Events(gtx) {
+	for _, evt := range e.clicker.Update(gtx) {
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Events(gtx.Metric, gtx, gesture.Both) {
+	for _, evt := range e.dragger.Update(gtx.Metric, gtx, gesture.Both) {
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents
@@ -399,6 +422,37 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 	if k.Modifiers.Contain(key.ModShift) {
 		selAct = selectionExtend
 	}
+	if k.Modifiers.Contain(key.ModShortcut) {
+		switch k.Name {
+		// Initiate a paste operation, by requesting the clipboard contents; other
+		// half is in Editor.processKey() under clipboard.Event.
+		case "V":
+			if !e.ReadOnly {
+				clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
+			}
+		// Copy or Cut selection -- ignored if nothing selected.
+		case "C", "X":
+			e.scratch = e.text.SelectedText(e.scratch)
+			if text := string(e.scratch); text != "" {
+				clipboard.WriteOp{Text: text}.Add(gtx.Ops)
+				if k.Name == "X" && !e.ReadOnly {
+					e.Delete(1)
+				}
+			}
+		// Select all
+		case "A":
+			e.text.SetCaret(0, e.text.Len())
+		case "Z":
+			if !e.ReadOnly {
+				if k.Modifiers.Contain(key.ModShift) {
+					e.redo()
+				} else {
+					e.undo()
+				}
+			}
+		}
+		return
+	}
 	switch k.Name {
 	case key.NameReturn, key.NameEnter:
 		if !e.ReadOnly {
@@ -450,32 +504,6 @@ func (e *Editor) command(gtx layout.Context, k key.Event) {
 		e.text.MoveStart(selAct)
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
-	// Initiate a paste operation, by requesting the clipboard contents; other
-	// half is in Editor.processKey() under clipboard.Event.
-	case "V":
-		if !e.ReadOnly {
-			clipboard.ReadOp{Tag: &e.eventKey}.Add(gtx.Ops)
-		}
-	// Copy or Cut selection -- ignored if nothing selected.
-	case "C", "X":
-		e.scratch = e.text.SelectedText(e.scratch)
-		if text := string(e.scratch); text != "" {
-			clipboard.WriteOp{Text: text}.Add(gtx.Ops)
-			if k.Name == "X" && !e.ReadOnly {
-				e.Delete(1)
-			}
-		}
-	// Select all
-	case "A":
-		e.text.SetCaret(0, e.text.Len())
-	case "Z":
-		if !e.ReadOnly {
-			if k.Modifiers.Contain(key.ModShift) {
-				e.redo()
-			} else {
-				e.undo()
-			}
-		}
 	}
 }
 
@@ -498,17 +526,17 @@ func (e *Editor) initBuffer() {
 		e.text.SetSource(e.buffer)
 	}
 	e.text.Alignment = e.Alignment
+	e.text.LineHeight = e.LineHeight
+	e.text.LineHeightScale = e.LineHeightScale
 	e.text.SingleLine = e.SingleLine
 	e.text.Mask = e.Mask
+	e.text.WrapPolicy = e.WrapPolicy
 }
 
-// Layout lays out the editor. If content is not nil, it is laid out on top.
-func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, size unit.Sp, content layout.Widget) layout.Dimensions {
+// Update the state of the editor in response to input events.
+func (e *Editor) Update(gtx layout.Context) {
 	e.initBuffer()
-	e.text.Update(gtx, lt, font, size, e.processEvents)
-
-	dims := e.layout(gtx, content)
-
+	e.processEvents(gtx)
 	if e.focused {
 		// Notify IME of selection if it changed.
 		newSel := e.ime.selection
@@ -534,8 +562,16 @@ func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font text.Font, siz
 
 		e.updateSnippet(gtx, e.ime.start, e.ime.end)
 	}
+}
 
-	return dims
+// Layout lays out the editor using the provided textMaterial as the paint material
+// for the text glyphs+caret and the selectMaterial as the paint material for the
+// selection rectangle.
+func (e *Editor) Layout(gtx layout.Context, lt *text.Shaper, font font.Font, size unit.Sp, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
+	e.Update(gtx)
+
+	e.text.Layout(gtx, lt, font, size)
+	return e.layout(gtx, textMaterial, selectMaterial)
 }
 
 // updateSnippet adds a key.SnippetOp if the snippet content or position
@@ -584,7 +620,7 @@ func (e *Editor) updateSnippet(gtx layout.Context, start, end int) {
 	}.Add(gtx.Ops)
 }
 
-func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimensions {
+func (e *Editor) layout(gtx layout.Context, textMaterial, selectMaterial op.CallOp) layout.Dimensions {
 	// Adjust scrolling for new viewport and layout.
 	e.text.ScrollRel(0, 0)
 
@@ -657,33 +693,44 @@ func (e *Editor) layout(gtx layout.Context, content layout.Widget) layout.Dimens
 		}
 		e.showCaret = e.focused && (!blinking || dt%timePerBlink < timePerBlink/2)
 	}
+	disabled := gtx.Queue == nil
 
-	if content != nil {
-		content(gtx)
+	semantic.Editor.Add(gtx.Ops)
+	if e.Len() > 0 {
+		e.paintSelection(gtx, selectMaterial)
+		e.paintText(gtx, textMaterial)
+	}
+	if !disabled {
+		e.paintCaret(gtx, textMaterial)
 	}
 	return visibleDims
 }
 
-// PaintSelection paints the contrasting background for selected text.
-func (e *Editor) PaintSelection(gtx layout.Context) {
+// paintSelection paints the contrasting background for selected text using the provided
+// material to set the painting material for the selection.
+func (e *Editor) paintSelection(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
 	if !e.focused {
 		return
 	}
-	e.text.PaintSelection(gtx)
+	e.text.PaintSelection(gtx, material)
 }
 
-func (e *Editor) PaintText(gtx layout.Context) {
+// paintText paints the text glyphs using the provided material to set the fill of the
+// glyphs.
+func (e *Editor) paintText(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
-	e.text.PaintText(gtx)
+	e.text.PaintText(gtx, material)
 }
 
-func (e *Editor) PaintCaret(gtx layout.Context) {
+// paintCaret paints the text glyphs using the provided material to set the fill material
+// of the caret rectangle.
+func (e *Editor) paintCaret(gtx layout.Context, material op.CallOp) {
 	e.initBuffer()
 	if !e.showCaret || e.ReadOnly {
 		return
 	}
-	e.text.PaintCaret(gtx)
+	e.text.PaintCaret(gtx, material)
 }
 
 // Len is the length of the editor contents, in runes.
@@ -722,22 +769,26 @@ func (e *Editor) CaretCoords() f32.Point {
 	return e.text.CaretCoords()
 }
 
-// Delete runes from the caret position. The sign of runes specifies the
+// Delete runes from the caret position. The sign of the argument specifies the
 // direction to delete: positive is forward, negative is backward.
 //
-// If there is a selection, it is deleted and counts as a single rune.
-func (e *Editor) Delete(runes int) {
+// If there is a selection, it is deleted and counts as a single grapheme
+// cluster.
+func (e *Editor) Delete(graphemeClusters int) {
 	e.initBuffer()
-	if runes == 0 {
+	if graphemeClusters == 0 {
 		return
 	}
 
 	start, end := e.text.Selection()
 	if start != end {
-		runes -= sign(runes)
+		graphemeClusters -= sign(graphemeClusters)
 	}
 
-	end += runes
+	// Move caret by the target quantity of clusters.
+	e.text.MoveCaret(0, graphemeClusters)
+	// Get the new rune offsets of the selection.
+	start, end = e.text.Selection()
 	e.replace(start, end, "", true)
 	// Reset xoff.
 	e.text.MoveCaret(0, 0)
@@ -873,7 +924,9 @@ func (e *Editor) replace(start, end int, s string, addHistory bool) int {
 
 // MoveCaret moves the caret (aka selection start) and the selection end
 // relative to their current positions. Positive distances moves forward,
-// negative distances moves backward. Distances are in runes.
+// negative distances moves backward. Distances are in grapheme clusters,
+// which closely match what users perceive as "characters" even when the
+// characters are multiple code points long.
 func (e *Editor) MoveCaret(startDelta, endDelta int) {
 	e.initBuffer()
 	e.text.MoveCaret(startDelta, endDelta)
