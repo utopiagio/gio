@@ -51,7 +51,6 @@ type LabelStyle struct {
 	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
 	// sensible default will be used.
 	LineHeightScale float32
-
 	// Shaper is the text shaper used to display this labe. This field is automatically
 	// set using by all constructor functions. If constructing a LabelStyle literal, you
 	// must provide a Shaper or displaying text will panic.

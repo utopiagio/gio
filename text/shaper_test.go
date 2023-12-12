@@ -11,8 +11,8 @@ import (
 
 	"github.com/utopiagio/gio/font"
 	"github.com/utopiagio/gio/font/gofont"
-	"github.com/utopiagio/gio/font/opentype"
-	"github.com/utopiagio/gio/io/system"
+	//"github.com/utopiagio/gio/font/opentype"
+	//"github.com/utopiagio/gio/io/system"
 	
 	"golang.org/x/exp/slices"
 	"golang.org/x/image/font/gofont/goregular"
