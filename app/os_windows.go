@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"log"
 	"runtime"
 	"sort"
 	"strings"
@@ -84,8 +85,15 @@ func osMain() {
 	select {}
 }
 
-func newWindow(window *callbacks, options []Option) error {
+//************************************************************************
+// Changed newWindow function to return window.HWND as well as error
+//func newWindow(window *callbacks, options []Option) (error) {
+func newWindow(window *callbacks, options []Option) (syscall.Handle, error) {
+	hWnd := make(chan syscall.Handle) 	// RNW Added*********************************
 	cerr := make(chan error)
+	var wg sync.WaitGroup 	// RNW Added*********************************
+	wg.Add(1) 				// RNW Added*********************************
+	
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
 		// then thread-specific messages such as WM_QUIT are ignored.
@@ -97,7 +105,12 @@ func newWindow(window *callbacks, options []Option) error {
 			cerr <- err
 			return
 		}
+
+		//log.Println("w.hWnd = ", w.hwnd)
+		hWnd <- w.hwnd 	// RNW Added*********************************
+		//log.Println("window.hWnd = ", hWnd)
 		cerr <- nil
+		wg.Done()	// RNW Added*************************************
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
 		w.w = window
@@ -113,8 +126,11 @@ func newWindow(window *callbacks, options []Option) error {
 			panic(err)
 		}
 	}()
-	return <-cerr
+	log.Println("return.hWnd = ", hWnd)
+	return <-hWnd, <-cerr 	// RNW Added*********************************
+	// return <-cerr
 }
+//************************************************************************
 
 // initResources initializes the resources global.
 func initResources() error {
@@ -172,6 +188,7 @@ func createNativeWindow() (*window, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Println("createNativeWindow.hwnd =", hwnd)
 	w := &window{
 		hwnd: hwnd,
 	}
@@ -186,16 +203,26 @@ func createNativeWindow() (*window, error) {
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
+	//log.Println("(w *window) update()..........................")
+	w.borderSize = image.Pt(
+		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
+		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
+	)
+
 	cr := windows.GetClientRect(w.hwnd)
 	w.config.Size = image.Point{
 		X: int(cr.Right - cr.Left),
 		Y: int(cr.Bottom - cr.Top),
 	}
-
-	w.borderSize = image.Pt(
-		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
-		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
-	)
+	// *************************************************************************
+	// RNW Added window position to update config after WM_MOVE message received
+	wr := windows.GetWindowRect(w.hwnd)
+	w.config.Pos = image.Point{
+		X: int(wr.Left),
+		Y: int(wr.Top),
+	}
+	//log.Println("windows.Rect=(", wr.Left, wr.Top, int(cr.Right - cr.Left), int(cr.Bottom - cr.Top), ")")
+	// *************************************************************************
 	w.w.Event(ConfigEvent{Config: w.config})
 }
 
@@ -309,7 +336,18 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// The system destroys the HWND for us.
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
+	case windows.WM_MOVE:	// lParam x, y
+		//log.Println("windows.WM_MOVE......................")
+		x, y := coordsFromlParam(lParam)
+		//log.Println("coords = (", x, y, ")")
+		w.config.Pos = image.Point{
+			X: x,
+			Y: y,
+		}
+		w.update()
+		w.draw(true)
 	case windows.WM_NCCALCSIZE:
+		//log.Println("windows.NCCALCSIZE:......................")
 		if w.config.Decorated {
 			// Let Windows handle decorations.
 			break
@@ -332,17 +370,22 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		szp.Rgrc[0] = mi.WorkArea
 		return 0
 	case windows.WM_PAINT:
+		//log.Println("windows.WM_PAINT......................")
 		w.draw(true)
 	case windows.WM_SIZE:
+		//log.Println("windows.WM_SIZE......................")
 		w.update()
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
+			//log.Println("windows.WM_SIZE.......MINIMIZED")
 			w.config.Mode = Minimized
 			w.setStage(system.StagePaused)
 		case windows.SIZE_MAXIMIZED:
+			//log.Println("windows.WM_SIZE.......MAXIMISED")
 			w.config.Mode = Maximized
 			w.setStage(system.StageRunning)
 		case windows.SIZE_RESTORED:
+			//log.Println("windows.WM_SIZE.......RESTORED")
 			if w.config.Mode != Fullscreen {
 				w.config.Mode = Windowed
 			}
@@ -615,6 +658,7 @@ func (w *window) setStage(s system.Stage) {
 }
 
 func (w *window) draw(sync bool) {
+	//log.Println("(w *window) draw(", sync, ")")
 	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
 		return
 	}
@@ -700,7 +744,7 @@ func (w *window) Configure(options []Option) {
 		// *******************************************************************
 		// Get target for client area position.
 		x = int32(w.config.Pos.X) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
-		x = int32(w.config.Pos.Y) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		y = int32(w.config.Pos.Y) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
 		// *******************************************************************
 		// Get target for client area size.
 		width = int32(w.config.Size.X)

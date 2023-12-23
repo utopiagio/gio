@@ -7,11 +7,14 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	//"log"
 	"runtime"
 	"time"
 	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
+
+	syscall "golang.org/x/sys/windows"
 
 	"github.com/utopiagio/gio/f32"
 	//"github.com/utopiagio/gio/font/opentype"
@@ -110,6 +113,7 @@ type Window struct {
 		*material.Theme
 		*widget.Decorations
 	}
+	hWnd syscall.Handle	// RNW Added parameter hWnd to store window handle
 
 	callbacks callbacks
 
@@ -230,6 +234,7 @@ func decoHeightOpt(h unit.Dp) Option {
 // and so on. The supplied operations list completely replaces the window state
 // from previous calls.
 func (w *Window) update(frame *op.Ops) {
+	//log.Println("(w *Window) update(frame *op.Ops)")
 	w.frames <- frame
 	<-w.frameAck
 }
@@ -368,6 +373,11 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 	w.updateAnimation(d)
 }
 
+// RNW Added new function to return Window HWND Handle
+func (w *Window) HWND() syscall.Handle {
+	return w.hWnd 
+}
+
 // Invalidate the window such that a FrameEvent will be generated immediately.
 // If the window is inactive, the event is sent when the window becomes active.
 //
@@ -377,6 +387,7 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 //
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
+	//log.Println("(w *Window) Invalidate().............................")
 	select {
 	case w.immediateRedraws <- struct{}{}:
 		return
@@ -855,6 +866,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e
 		w.waitAck(d)
 	case frameEvent:
+		//log.Println("(w *Window) processEvent(FrameEvent)..................")
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
@@ -920,6 +932,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 		w.waitAck(d)
 	case ConfigEvent:
+		//log.Println("(w *Window) processEvent(CONFIGEvent)..................")
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
 		w.out <- e2
@@ -969,10 +982,23 @@ func (w *Window) NextEvent() event.Event {
 	state := &w.eventState
 	if !state.created {
 		state.created = true
-		if err := newWindow(&w.callbacks, state.initialOpts); err != nil {
-			close(w.destroy)
-			return system.DestroyEvent{Err: err}
-		}
+		// *************************************************************************
+		// RNW Changed newWindow() function to return HWND handle for windows
+		if runtime.GOOS == "windows" {
+			if hWnd, err := newWindow(&w.callbacks, state.initialOpts); err != nil {
+				close(w.destroy)
+				return system.DestroyEvent{Err: err}
+			} else {
+				//log.Println("New Window::hWnd =", hWnd)
+				w.hWnd = hWnd
+			}
+		} else {
+		// *************************************************************************
+			if _, err := newWindow(&w.callbacks, state.initialOpts); err != nil {
+				close(w.destroy)
+				return system.DestroyEvent{Err: err}
+			}
+		}	// RNW added	
 	}
 	for {
 		var (
@@ -1061,6 +1087,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	decoHeight := gtx.Dp(w.decorations.Config.decoHeight)
 	if w.decorations.currentHeight != decoHeight {
 		w.decorations.currentHeight = decoHeight
+		//log.Println("w.out <- ConfigEvent{Config: w.effectiveConfig()}")
 		w.out <- ConfigEvent{Config: w.effectiveConfig()}
 	}
 	e.Size.Y -= w.decorations.currentHeight
