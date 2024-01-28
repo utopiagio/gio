@@ -14,7 +14,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	syscall "golang.org/x/sys/windows"
+	//syscall "golang.org/x/sys/windows"
 
 	"github.com/utopiagio/gio/f32"
 	//"github.com/utopiagio/gio/font/opentype"
@@ -113,7 +113,7 @@ type Window struct {
 		*material.Theme
 		*widget.Decorations
 	}
-	hWnd syscall.Handle	// RNW Added parameter hWnd to store window handle
+	//hWnd syscall.Handle	// RNW Added parameter hWnd to store window handle
 
 	callbacks callbacks
 
@@ -234,7 +234,6 @@ func decoHeightOpt(h unit.Dp) Option {
 // and so on. The supplied operations list completely replaces the window state
 // from previous calls.
 func (w *Window) update(frame *op.Ops) {
-	//log.Println("(w *Window) update(frame *op.Ops)")
 	w.frames <- frame
 	<-w.frameAck
 }
@@ -371,11 +370,6 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation(d)
-}
-
-// RNW Added new function to return Window HWND Handle
-func (w *Window) HWND() syscall.Handle {
-	return w.hWnd 
 }
 
 // Invalidate the window such that a FrameEvent will be generated immediately.
@@ -866,7 +860,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e
 		w.waitAck(d)
 	case frameEvent:
-		//log.Println("(w *Window) processEvent(FrameEvent)..................")
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
@@ -932,7 +925,6 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 		w.waitAck(d)
 	case ConfigEvent:
-		//log.Println("(w *Window) processEvent(CONFIGEvent)..................")
 		w.decorations.Config = e2.Config
 		e2.Config = w.effectiveConfig()
 		w.out <- e2
@@ -983,23 +975,10 @@ func (w *Window) NextEvent() event.Event {
 	state := &w.eventState
 	if !state.created {
 		state.created = true
-		// *************************************************************************
-		// RNW Changed newWindow() function to return HWND handle for windows
-		if runtime.GOOS == "windows" {
-			if hWnd, err := newWindow(&w.callbacks, state.initialOpts); err != nil {
+			if err := newWindow(&w.callbacks, state.initialOpts); err != nil {
 				close(w.destroy)
 				return system.DestroyEvent{Err: err}
-			} else {
-				//log.Println("New Window::hWnd =", hWnd)
-				w.hWnd = hWnd
-			}
-		} else {
-		// *************************************************************************
-			if _, err := newWindow(&w.callbacks, state.initialOpts); err != nil {
-				close(w.destroy)
-				return system.DestroyEvent{Err: err}
-			}
-		}	// RNW added	
+			}	
 	}
 	for {
 		var (
@@ -1088,7 +1067,6 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	decoHeight := gtx.Dp(w.decorations.Config.decoHeight)
 	if w.decorations.currentHeight != decoHeight {
 		w.decorations.currentHeight = decoHeight
-		//log.Println("w.out <- ConfigEvent{Config: w.effectiveConfig()}")
 		w.out <- ConfigEvent{Config: w.effectiveConfig()}
 	}
 	e.Size.Y -= w.decorations.currentHeight
@@ -1142,14 +1120,56 @@ func Title(t string) Option {
 	}
 }
 
+// **************************************************************************
+// ************ RNW Added GetAbsClientPos (image.Point) to config 01.11.2023 ************
+// GetClientPos returns the position of the client window. 
+func (w *Window) GetAbsClientPos() (x, y int) {
+	pos := w.decorations.Config.Pos
+	//pos.X += 1
+	pos.Y += w.decorations.currentHeight
+	return pos.X, pos.Y
+}
+
+// **************************************************************************
+// ************ RNW Added GetClientPos (image.Point) to config 01.11.2023 ************
+// GetClientPos returns the position of the client window. 
+func (w *Window) GetClientPos() (x, y int) {
+	return 0, 0
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetWindowPos (image.Point) to config 01.11.2023 ************
+// GetWindowPos returns the screen position of the window.
+func (w *Window) GetWindowPos() (x, y int) {
+	pos := w.decorations.Config.Pos
+	return pos.X, pos.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetClientSize (image.Point) to config 01.11.2023 ************
+// GetClientSize returns the size of the window client area.
+func (w *Window) GetClientSize() (width, height int) {
+	size := w.decorations.Config.Size
+	size.Y -= int(w.decorations.height)
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetWindowSize (image.Point) to config 01.11.2023 ************
+// GetWindowSize returns the size of the window.
+func (w *Window) GetWindowSize() (width, height int) {
+	size := w.decorations.Config.Size
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added Pos (image.Point) to config 01.11.2023 ************
 // Pos sets the position of the window. The mode will be changed to Windowed.
 func Pos(x, y unit.Dp) Option {
-	/*if w <= 0 {
-		panic("width must be larger than or equal to 0")
-	}
-	if h <= 0 {
-		panic("height must be larger than or equal to 0")
-	}*/
 	return func(m unit.Metric, cnf *Config) {
 		cnf.Mode = Windowed
 		cnf.Pos = image.Point{
@@ -1158,6 +1178,7 @@ func Pos(x, y unit.Dp) Option {
 		}
 	}
 }
+// **************************************************************************
 
 // Size sets the size of the window. The mode will be changed to Windowed.
 func Size(w, h unit.Dp) Option {

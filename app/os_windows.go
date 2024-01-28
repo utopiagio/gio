@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"log"
 	"runtime"
 	"sort"
 	"strings"
@@ -18,15 +17,14 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"github.com/utopiagio/gio/app/internal/windows"
-	"github.com/utopiagio/gio/unit"
-	gowindows "golang.org/x/sys/windows"
-
 	"github.com/utopiagio/gio/f32"
 	"github.com/utopiagio/gio/io/clipboard"
 	"github.com/utopiagio/gio/io/key"
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/unit"
+
+	"github.com/utopiagio/gio/app/internal/windows"
 )
 
 type ViewEvent struct {
@@ -85,15 +83,9 @@ func osMain() {
 	select {}
 }
 
-//************************************************************************
-// Changed newWindow function to return window.HWND as well as error
-//func newWindow(window *callbacks, options []Option) (error) {
-func newWindow(window *callbacks, options []Option) (syscall.Handle, error) {
-	hWnd := make(chan syscall.Handle) 	// RNW Added*********************************
+func newWindow(window *callbacks, options []Option) (error) {
 	cerr := make(chan error)
-	var wg sync.WaitGroup 	// RNW Added*********************************
-	wg.Add(1) 				// RNW Added*********************************
-	
+
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
 		// then thread-specific messages such as WM_QUIT are ignored.
@@ -105,12 +97,7 @@ func newWindow(window *callbacks, options []Option) (syscall.Handle, error) {
 			cerr <- err
 			return
 		}
-
-		//log.Println("w.hWnd = ", w.hwnd)
-		hWnd <- w.hwnd 	// RNW Added*********************************
-		//log.Println("window.hWnd = ", hWnd)
 		cerr <- nil
-		wg.Done()	// RNW Added*************************************
 		winMap.Store(w.hwnd, w)
 		defer winMap.Delete(w.hwnd)
 		w.w = window
@@ -126,11 +113,8 @@ func newWindow(window *callbacks, options []Option) (syscall.Handle, error) {
 			panic(err)
 		}
 	}()
-	log.Println("return.hWnd = ", hWnd)
-	return <-hWnd, <-cerr 	// RNW Added*********************************
-	// return <-cerr
+	return <-cerr
 }
-//************************************************************************
 
 // initResources initializes the resources global.
 func initResources() error {
@@ -188,7 +172,6 @@ func createNativeWindow() (*window, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Println("createNativeWindow.hwnd =", hwnd)
 	w := &window{
 		hwnd: hwnd,
 	}
@@ -203,7 +186,6 @@ func createNativeWindow() (*window, error) {
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
-	//log.Println("(w *window) update()..........................")
 	w.borderSize = image.Pt(
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
@@ -337,9 +319,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
 	case windows.WM_MOVE:	// lParam x, y
-		//log.Println("windows.WM_MOVE......................")
 		x, y := coordsFromlParam(lParam)
-		//log.Println("coords = (", x, y, ")")
 		w.config.Pos = image.Point{
 			X: x,
 			Y: y,
@@ -347,7 +327,6 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.update()
 		w.draw(true)
 	case windows.WM_NCCALCSIZE:
-		//log.Println("windows.NCCALCSIZE:......................")
 		if w.config.Decorated {
 			// Let Windows handle decorations.
 			break
@@ -370,22 +349,17 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		szp.Rgrc[0] = mi.WorkArea
 		return 0
 	case windows.WM_PAINT:
-		//log.Println("windows.WM_PAINT......................")
 		w.draw(true)
 	case windows.WM_SIZE:
-		//log.Println("windows.WM_SIZE......................")
 		w.update()
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
-			//log.Println("windows.WM_SIZE.......MINIMIZED")
 			w.config.Mode = Minimized
 			w.setStage(system.StagePaused)
 		case windows.SIZE_MAXIMIZED:
-			//log.Println("windows.WM_SIZE.......MAXIMISED")
 			w.config.Mode = Maximized
 			w.setStage(system.StageRunning)
 		case windows.SIZE_RESTORED:
-			//log.Println("windows.WM_SIZE.......RESTORED")
 			if w.config.Mode != Fullscreen {
 				w.config.Mode = Windowed
 			}
@@ -658,7 +632,6 @@ func (w *window) setStage(s system.Stage) {
 }
 
 func (w *window) draw(sync bool) {
-	//log.Println("(w *window) draw(", sync, ")")
 	if w.config.Size.X == 0 || w.config.Size.Y == 0 {
 		return
 	}
@@ -710,7 +683,7 @@ func (w *window) readClipboard() error {
 		return err
 	}
 	defer windows.GlobalUnlock(mem)
-	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
+	content := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
 	w.w.Event(clipboard.Event{Text: content})
 	return nil
 }
@@ -742,7 +715,7 @@ func (w *window) Configure(options []Option) {
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
 		// *******************************************************************
-		// Get target for client area position.
+		// RNW Added Get target for client area position.
 		x = int32(w.config.Pos.X) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
 		y = int32(w.config.Pos.Y) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
 		// *******************************************************************
@@ -752,11 +725,10 @@ func (w *window) Configure(options []Option) {
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
 		// *******************************************************************
-		if x < 0 {x = wr.Left} // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
-		if y < 0 {y = wr.Top}  // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		// ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		if x < 0 {x = wr.Left} 
+		if y < 0 {y = wr.Top}  
 		// *******************************************************************
-		//x = wr.Left
-		//y = wr.Top
 		if w.config.Decorated {
 			// Compute client size and position. Note that the client size is
 			// equal to the window size when we are in control of decorations.
@@ -800,7 +772,7 @@ func (w *window) writeClipboard(s string) error {
 	if err := windows.EmptyClipboard(); err != nil {
 		return err
 	}
-	u16, err := gowindows.UTF16FromString(s)
+	u16, err := syscall.UTF16FromString(s)
 	if err != nil {
 		return err
 	}

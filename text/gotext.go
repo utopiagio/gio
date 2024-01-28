@@ -284,7 +284,6 @@ func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
 func (s *shaperImpl) Load(f FontFace) {
 	md := opentype.FontToDescription(f.Font)
 	location := fontscan.Location{File: fmt.Sprint(md)}
-	log.Println("location =", location)
 	s.fontMap.AddFace(f.Face.Face(), location, md)
 	s.addFace(f.Face.Face(), f.Font)
 }

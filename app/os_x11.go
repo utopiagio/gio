@@ -35,14 +35,14 @@ import (
 	"time"
 	"unsafe"
 
+	syscall "golang.org/x/sys/unix"
+
 	"github.com/utopiagio/gio/f32"
 	"github.com/utopiagio/gio/io/clipboard"
 	"github.com/utopiagio/gio/io/key"
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/io/system"
 	"github.com/utopiagio/gio/unit"
-
-	syscall "golang.org/x/sys/unix"
 
 	"github.com/utopiagio/gio/app/internal/xkb"
 )
@@ -209,6 +209,10 @@ func (w *x11Window) Configure(options []Option) {
 			w.sendWMStateEvent(_NET_WM_STATE_REMOVE, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
 		}
 		w.setTitle(prev, cnf)
+		if prev.Pos != cnf.Pos {
+			w.config.Pos = cnf.Pos
+			C.XMoveWindow(w.x, w.xw, C.int(cnf.Pos.X), C.int(cnf.Pos.Y))
+		}
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
 			C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
