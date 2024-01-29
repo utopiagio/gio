@@ -209,10 +209,13 @@ func (w *x11Window) Configure(options []Option) {
 			w.sendWMStateEvent(_NET_WM_STATE_REMOVE, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
 		}
 		w.setTitle(prev, cnf)
+		// **************************************************************************
+		// ************ RNW Added config pos change to X11 28.01.2024 ***************
 		if prev.Pos != cnf.Pos {
 			w.config.Pos = cnf.Pos
 			C.XMoveWindow(w.x, w.xw, C.int(cnf.Pos.X), C.int(cnf.Pos.Y))
 		}
+		// **************************************************************************
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
 			C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
@@ -630,10 +633,17 @@ func (h *x11EventHandler) handleEvents() bool {
 			w.w.Event(key.FocusEvent{Focus: false})
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
+			// **************************************************************************
+			// ************ RNW Added pos to ConfigureNotify 28.01.2024 *****************
+			// expose event for redraw after move event is delayed till mouse release****
 			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
 				w.config.Size = sz
 				w.w.Event(ConfigEvent{Config: w.config})
+			} else if pos := image.Pt(int(cevt.x), int(cevt.y)); pos != w.config.Pos {
+				w.config.Pos = pos
+				w.w.Event(ConfigEvent{Config: w.config})
 			}
+			// **************************************************************************
 			// redraw will be done by a later expose event
 		case C.SelectionNotify:
 			cevt := (*C.XSelectionEvent)(unsafe.Pointer(xev))

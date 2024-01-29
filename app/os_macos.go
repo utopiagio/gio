@@ -55,6 +55,16 @@ static CFTypeRef readClipboard(void) {
 	}
 }
 
+//static CGFloat viewX(CFTypeRef viewRef) {
+	//NSView *view = (__bridge NSView *)viewRef;
+	//return NSMinX([view frame]);
+//}
+
+//static CGFloat viewY(CFTypeRef viewRef) {
+	//NSView *view = (__bridge NSView *)viewRef;
+	//return NSMinX([view frame]);
+//}
+
 static CGFloat viewHeight(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
 	return [view bounds].size.height;
@@ -385,7 +395,8 @@ func (w *window) Configure(options []Option) {
 		w.config.Mode = Windowed
 		w.setTitle(prev, cnf)
 		// *************************************************************************
-		// RNW Added window position to update config.Pos
+		// **************************************************************************
+		// ************ RNW Added config pos change  28.01.2024 ***************
 		if prev.Pos != cnf.Pos {
 			w.config.Pos = cnf.Pos
 			cnf.Pos = cnf.Pos.Div(int(screenScale))
@@ -786,6 +797,7 @@ func (w *window) draw() {
 		w.config.Size = sz
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
+
 	if sz.X == 0 || sz.Y == 0 {
 		return
 	}
