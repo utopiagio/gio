@@ -14,7 +14,7 @@ import (
 
 	"github.com/utopiagio/gio/gpu/internal/driver"
 	"github.com/utopiagio/gio/internal/gl"
-	"github.com/utopiagio/gio/shader"
+	"gioui.org/shader"
 )
 
 // Backend implements driver.Device.

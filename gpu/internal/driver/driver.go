@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/shader"
+	"gioui.org/shader"
 )
 
 // Device represents the abstraction of underlying GPU

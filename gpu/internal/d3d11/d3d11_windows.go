@@ -14,7 +14,7 @@ import (
 
 	"github.com/utopiagio/gio/gpu/internal/driver"
 	"github.com/utopiagio/gio/internal/d3d11"
-	"github.com/utopiagio/gio/shader"
+	"gioui.org/shader"
 )
 
 type Backend struct {

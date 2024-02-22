@@ -15,8 +15,8 @@ import (
 	"github.com/utopiagio/gio/gpu/internal/driver"
 	"github.com/utopiagio/gio/internal/byteslice"
 	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/shader"
-	"github.com/utopiagio/gio/shader/gio"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
 )
 
 var dumpImages = flag.Bool("saveimages", false, "save test images")

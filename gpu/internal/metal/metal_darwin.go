@@ -9,7 +9,7 @@ import (
 	"unsafe"
 
 	"github.com/utopiagio/gio/gpu/internal/driver"
-	"github.com/utopiagio/gio/shader"
+	"gioui.org/shader"
 )
 
 /*

@@ -15,8 +15,8 @@ import (
 	"github.com/utopiagio/gio/internal/byteslice"
 	"github.com/utopiagio/gio/internal/f32"
 	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/shader"
-	"github.com/utopiagio/gio/shader/gio"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
 )
 
 type pather struct {

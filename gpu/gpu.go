@@ -27,8 +27,8 @@ import (
 	"github.com/utopiagio/gio/internal/stroke"
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/shader"
-	"github.com/utopiagio/gio/shader/gio"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
 
 	// Register backends.
 	_ "github.com/utopiagio/gio/gpu/internal/d3d11"

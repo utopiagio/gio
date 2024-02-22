@@ -20,7 +20,7 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/utopiagio/gio/cpu"
+	"gioui.org/cpu"
 	"github.com/utopiagio/gio/gpu/internal/driver"
 	"github.com/utopiagio/gio/internal/byteslice"
 	"github.com/utopiagio/gio/internal/f32"
@@ -29,9 +29,9 @@ import (
 	"github.com/utopiagio/gio/internal/scene"
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/shader"
-	"github.com/utopiagio/gio/shader/gio"
-	"github.com/utopiagio/gio/shader/piet"
+	"gioui.org/shader"
+	"gioui.org/shader/gio"
+	"gioui.org/shader/piet"
 )
 
 type compute struct {
