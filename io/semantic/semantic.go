@@ -10,8 +10,8 @@
 package semantic
 
 import (
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 // LabelOp provides the content of a textual component.

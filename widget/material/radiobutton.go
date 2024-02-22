@@ -3,9 +3,9 @@
 package material
 
 import (
-	"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gioui/gio/io/semantic"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 type RadioButtonStyle struct {

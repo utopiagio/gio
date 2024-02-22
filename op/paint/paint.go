@@ -9,10 +9,10 @@ import (
 	"image/draw"
 	"math"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
 )
 
 // ImageFilter is the scaling filter for images.

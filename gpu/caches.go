@@ -5,7 +5,7 @@ package gpu
 import (
 	"fmt"
 
-	"github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gioui/gio/internal/f32"
 )
 
 type textureCacheKey struct {

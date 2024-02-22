@@ -22,14 +22,14 @@ import (
 
 	syscall "golang.org/x/sys/unix"
 
-	"github.com/utopiagio/gio/app/internal/xkb"
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/internal/fling"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/app/internal/xkb"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/internal/fling"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 // Use wayland-scanner to generate glue code for the xdg-shell and xdg-decoration extensions.
@@ -194,7 +194,7 @@ type window struct {
 		dir            f32.Point
 	}
 
-	stage             system.Stage
+	stage             Stage
 	dead              bool
 	lastFrameCallback *C.struct_wl_callback
 
@@ -209,7 +209,7 @@ type window struct {
 	wsize        image.Point // window config size before going fullscreen or maximized
 	inCompositor bool        // window is moving or being resized
 
-	clipReads chan clipboard.Event
+	clipReads chan transfer.DataEvent
 
 	wakeups chan struct{}
 }
@@ -277,7 +277,7 @@ func newWLWindow(callbacks *callbacks, options []Option) error {
 
 		err := w.loop()
 		w.w.Event(WaylandViewEvent{})
-		w.w.Event(system.DestroyEvent{Err: err})
+		w.w.Event(DestroyEvent{Err: err})
 	}()
 	return nil
 }
@@ -354,7 +354,7 @@ func (d *wlDisplay) createNativeWindow(options []Option) (*window, error) {
 		ppdp:      ppdp,
 		ppsp:      ppdp,
 		wakeups:   make(chan struct{}, 1),
-		clipReads: make(chan clipboard.Event, 1),
+		clipReads: make(chan transfer.DataEvent, 1),
 	}
 	w.surf = C.wl_compositor_create_surface(d.compositor)
 	if w.surf == nil {
@@ -551,7 +551,7 @@ func gio_onXdgSurfaceConfigure(data unsafe.Pointer, wmSurf *C.struct_xdg_surface
 	w.serial = serial
 	w.redraw = true
 	C.xdg_surface_ack_configure(wmSurf, serial)
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 }
 
 //export gio_onToplevelClose
@@ -1021,20 +1021,24 @@ func (w *window) ReadClipboard() {
 	r, err := w.disp.readClipboard()
 	// Send empty responses on unavailable clipboards or errors.
 	if r == nil || err != nil {
-		w.w.Event(clipboard.Event{})
 		return
 	}
 	// Don't let slow clipboard transfers block event loop.
 	go func() {
 		defer r.Close()
 		data, _ := io.ReadAll(r)
-		w.clipReads <- clipboard.Event{Text: string(data)}
+		w.clipReads <- transfer.DataEvent{
+			Type: "application/text",
+			Open: func() io.ReadCloser {
+				return io.NopCloser(bytes.NewReader(data))
+			},
+		}
 		w.Wakeup()
 	}()
 }
 
-func (w *window) WriteClipboard(s string) {
-	w.disp.writeClipboard([]byte(s))
+func (w *window) WriteClipboard(mime string, s []byte) {
+	w.disp.writeClipboard(s)
 }
 
 func (w *window) Configure(options []Option) {
@@ -1673,9 +1677,9 @@ func (w *window) updateOutputs() {
 		w.redraw = true
 	}
 	if !found {
-		w.setStage(system.StagePaused)
+		w.setStage(StagePaused)
 	} else {
-		w.setStage(system.StageRunning)
+		w.setStage(StageRunning)
 		w.redraw = true
 	}
 }
@@ -1712,7 +1716,7 @@ func (w *window) draw() {
 		C.wl_callback_add_listener(w.lastFrameCallback, &C.gio_callback_listener, unsafe.Pointer(w.surf))
 	}
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Metric: cfg,
@@ -1721,12 +1725,12 @@ func (w *window) draw() {
 	})
 }
 
-func (w *window) setStage(s system.Stage) {
+func (w *window) setStage(s Stage) {
 	if s == w.stage {
 		return
 	}
 	w.stage = s
-	w.w.Event(system.StageEvent{Stage: s})
+	w.w.Event(StageEvent{Stage: s})
 }
 
 func (w *window) display() *C.struct_wl_display {

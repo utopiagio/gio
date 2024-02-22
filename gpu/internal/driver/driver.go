@@ -7,7 +7,7 @@ import (
 	"image"
 	"time"
 
-	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
 	"gioui.org/shader"
 )
 

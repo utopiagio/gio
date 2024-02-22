@@ -5,15 +5,18 @@ package widget_test
 import (
 	"fmt"
 	"image"
+	"io"
+	"strings"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/io/transfer"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 func ExampleClickable_passthrough() {
@@ -21,11 +24,11 @@ func ExampleClickable_passthrough() {
 	// pointer events can be passed down for the underlying
 	// widgets to pick them up.
 	var button1, button2 widget.Clickable
-	var r router.Router
+	var r input.Router
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Queue:       &r,
+		Source:      r.Source(),
 	}
 
 	// widget lays out two buttons on top of each other.
@@ -71,15 +74,15 @@ func ExampleClickable_passthrough() {
 }
 
 func ExampleDraggable_Layout() {
-	var r router.Router
+	var r input.Router
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Queue:       &r,
+		Source:      r.Source(),
 	}
 	// mime is the type used to match drag and drop operations.
 	// It could be left empty in this example.
-	mime := "MyMime"
+	const mime = "MyMime"
 	drag := &widget.Draggable{Type: mime}
 	var drop int
 	// widget lays out the drag and drop handlers and processes
@@ -94,7 +97,7 @@ func ExampleDraggable_Layout() {
 		// drag must respond with an Offer event when requested.
 		// Use the drag method for this.
 		if m, ok := drag.Update(gtx); ok {
-			drag.Offer(gtx.Ops, m, offer{Data: "hello world"})
+			drag.Offer(gtx, m, io.NopCloser(strings.NewReader("hello world")))
 		}
 
 		// Setup the area for drops.
@@ -102,17 +105,21 @@ func ExampleDraggable_Layout() {
 			Min: image.Pt(20, 20),
 			Max: image.Pt(40, 40),
 		}.Push(gtx.Ops)
-		transfer.TargetOp{
-			Tag:  &drop,
-			Type: mime, // this must match the drag Type for the drop to succeed
-		}.Add(gtx.Ops)
+		event.Op(gtx.Ops, &drop)
 		ds.Pop()
+
 		// Check for the received data.
-		for _, ev := range gtx.Events(&drop) {
+		for {
+			ev, ok := gtx.Event(transfer.TargetFilter{Target: &drop, Type: mime})
+			if !ok {
+				break
+			}
 			switch e := ev.(type) {
 			case transfer.DataEvent:
 				data := e.Open()
-				fmt.Println(data.(offer).Data)
+				defer data.Close()
+				content, _ := io.ReadAll(data)
+				fmt.Println(string(content))
 			}
 		}
 	}
@@ -145,10 +152,3 @@ func ExampleDraggable_Layout() {
 	// Output:
 	// hello world
 }
-
-type offer struct {
-	Data string
-}
-
-func (offer) Read([]byte) (int, error) { return 0, nil }
-func (offer) Close() error             { return nil }

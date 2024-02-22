@@ -9,25 +9,15 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/utopiagio/gio/f32"
-	//"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-
-	//"gioui.org/f32"
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/op/clip"
-	//"github.com/utopiagio/gio/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
 	"golang.org/x/exp/slices"
-
 	"golang.org/x/image/math/fixed"
 )
 

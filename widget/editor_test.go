@@ -16,31 +16,18 @@ import (
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
 	"eliasnaur.com/font/roboto/robotoregular"
-
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/font/gofont"
-	"github.com/utopiagio/gio/font/opentype"
-	"github.com/utopiagio/gio/io/event"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-
-	//"gioui.org/f32"
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/font/gofont"
-	//"gioui.org/font/opentype"
-	//"gioui.org/io/event"
-	//"gioui.org/io/key"
-	//"gioui.org/io/pointer"
-	//"gioui.org/io/system"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/text"
-	//"gioui.org/unit"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/font/gofont"
+	"github.com/utopiagio/gioui/gio/font/opentype"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 var english = system.Locale{
@@ -109,17 +96,14 @@ func assertContents(t *testing.T, e *Editor, contents string, selectionStart, se
 // TestEditorReadOnly ensures that mouse and keyboard interactions with readonly
 // editors do nothing but manipulate the text selection.
 func TestEditorReadOnly(t *testing.T) {
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops: new(op.Ops),
 		Constraints: layout.Constraints{
 			Max: image.Pt(100, 100),
 		},
 		Locale: english,
-	}
-	gtx.Queue = &testQueue{
-		events: []event.Event{
-			key.FocusEvent{Focus: true},
-		},
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
@@ -131,12 +115,23 @@ func TestEditorReadOnly(t *testing.T) {
 	if cStart != cEnd {
 		t.Errorf("unexpected initial caret positions")
 	}
-	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	gtx.Execute(key.FocusCmd{Tag: e})
+	layoutEditor := func() layout.Dimensions {
+		return e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	}
+	layoutEditor()
+	r.Frame(gtx.Ops)
+	gtx.Ops.Reset()
+	layoutEditor()
+	r.Frame(gtx.Ops)
+	gtx.Ops.Reset()
+	layoutEditor()
+	r.Frame(gtx.Ops)
 
 	// Select everything.
 	gtx.Ops.Reset()
-	gtx.Queue = &testQueue{events: []event.Event{key.Event{Name: "A", Modifiers: key.ModShortcut}}}
-	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Queue(key.Event{Name: "A", Modifiers: key.ModShortcut})
+	layoutEditor()
 	textContent := e.Text()
 	cStart2, cEnd2 := e.Selection()
 	if cStart2 > cEnd2 {
@@ -151,7 +146,7 @@ func TestEditorReadOnly(t *testing.T) {
 
 	// Type some new characters.
 	gtx.Ops.Reset()
-	gtx.Queue = &testQueue{events: []event.Event{key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"}}}
+	r.Queue(key.EditEvent{Range: key.Range{Start: cStart2, End: cEnd2}, Text: "something else"})
 	e.Update(gtx)
 	textContent2 := e.Text()
 	if textContent2 != textContent {
@@ -160,8 +155,8 @@ func TestEditorReadOnly(t *testing.T) {
 
 	// Try to delete selection.
 	gtx.Ops.Reset()
-	gtx.Queue = &testQueue{events: []event.Event{key.Event{Name: key.NameDeleteBackward}}}
-	dims := e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Queue(key.Event{Name: key.NameDeleteBackward})
+	dims := layoutEditor()
 	textContent2 = e.Text()
 	if textContent2 != textContent {
 		t.Errorf("readonly editor modified by delete key.Event")
@@ -170,14 +165,14 @@ func TestEditorReadOnly(t *testing.T) {
 	// Click and drag from the middle of the first line
 	// to the center.
 	gtx.Ops.Reset()
-	gtx.Queue = &testQueue{events: []event.Event{
+	r.Queue(
 		pointer.Event{
 			Kind:     pointer.Press,
 			Buttons:  pointer.ButtonPrimary,
 			Position: f32.Pt(float32(dims.Size.X)*.5, 5),
 		},
 		pointer.Event{
-			Kind:     pointer.Drag,
+			Kind:     pointer.Move,
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
@@ -186,7 +181,7 @@ func TestEditorReadOnly(t *testing.T) {
 			Buttons:  pointer.ButtonPrimary,
 			Position: layout.FPt(dims.Size).Mul(.5),
 		},
-	}}
+	)
 	e.Update(gtx)
 	cStart3, cEnd3 := e.Selection()
 	if cStart3 == cStart2 || cEnd3 == cEnd2 {
@@ -509,22 +504,22 @@ func TestEditorLigature(t *testing.T) {
 
 func TestEditorDimensions(t *testing.T) {
 	e := new(Editor)
-	tq := &testQueue{
-		events: []event.Event{
-			key.EditEvent{Text: "A"},
-		},
-	}
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Constraints{Max: image.Pt(100, 100)},
-		Queue:       tq,
+		Source:      r.Source(),
 		Locale:      english,
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
+	gtx.Execute(key.FocusCmd{Tag: e})
+	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	r.Queue(key.EditEvent{Text: "A"})
 	dims := e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-	if dims.Size.X == 0 {
+	if dims.Size.X < 5 {
 		t.Errorf("EditEvent was not reflected in Editor width")
 	}
 }
@@ -895,9 +890,11 @@ f 2 4 6 8 f
 g 2 4 6 8 g
 `)
 
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	font := font.Font{}
@@ -905,42 +902,39 @@ g 2 4 6 8 g
 
 	var tim time.Duration
 	selected := func(start, end int) string {
+		gtx.Execute(key.FocusCmd{Tag: e})
 		// Layout once with no events; populate e.lines.
-		gtx.Queue = nil
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-		_ = e.Events() // throw away any events from this layout
 
+		r.Frame(gtx.Ops)
+		gtx.Source = r.Source()
 		// Build the selection events
 		startPos := e.text.closestToRune(start)
 		endPos := e.text.closestToRune(end)
-		tq := &testQueue{
-			events: []event.Event{
-				pointer.Event{
-					Buttons:  pointer.ButtonPrimary,
-					Kind:     pointer.Press,
-					Source:   pointer.Mouse,
-					Time:     tim,
-					Position: f32.Pt(textWidth(e, startPos.lineCol.line, 0, startPos.lineCol.col), textBaseline(e, startPos.lineCol.line)),
-				},
-				pointer.Event{
-					Kind:     pointer.Release,
-					Source:   pointer.Mouse,
-					Time:     tim,
-					Position: f32.Pt(textWidth(e, endPos.lineCol.line, 0, endPos.lineCol.col), textBaseline(e, endPos.lineCol.line)),
-				},
+		r.Queue(
+			pointer.Event{
+				Buttons:  pointer.ButtonPrimary,
+				Kind:     pointer.Press,
+				Source:   pointer.Mouse,
+				Time:     tim,
+				Position: f32.Pt(textWidth(e, startPos.lineCol.line, 0, startPos.lineCol.col), textBaseline(e, startPos.lineCol.line)),
 			},
-		}
+			pointer.Event{
+				Kind:     pointer.Release,
+				Source:   pointer.Mouse,
+				Time:     tim,
+				Position: f32.Pt(textWidth(e, endPos.lineCol.line, 0, endPos.lineCol.col), textBaseline(e, endPos.lineCol.line)),
+			},
+		)
 		tim += time.Second // Avoid multi-clicks.
-		gtx.Queue = tq
 
-		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
-		for _, evt := range e.Events() {
-			switch evt.(type) {
-			case SelectEvent:
-				return e.SelectedText()
+		for {
+			_, ok := e.Update(gtx) // throw away any events from this layout
+			if !ok {
+				break
 			}
 		}
-		return ""
+		return e.SelectedText()
 	}
 	type screenPos image.Point
 	logicalPosMatch := func(t *testing.T, n int, label string, expected screenPos, actual combinedPos) {
@@ -978,7 +972,7 @@ g 2 4 6 8 g
 		// Constrain the editor to roughly 6 columns wide and redraw
 		gtx.Constraints = layout.Exact(image.Pt(36, 36))
 		// Keep existing selection
-		gtx.Queue = nil
+		gtx = gtx.Disabled()
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 		caretStart := e.text.closestToRune(e.text.caret.start)
@@ -993,19 +987,30 @@ func TestSelectMove(t *testing.T) {
 	e := new(Editor)
 	e.SetText(`0123456789`)
 
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	font := font.Font{}
 	fontSize := unit.Sp(10)
 
 	// Layout once to populate e.lines and get focus.
-	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	// Set up selecton so the Editor key handler filters for all 4 directional keys.
+	e.SetCaret(3, 6)
+	gtx.Ops.Reset()
+	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	gtx.Ops.Reset()
+	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
 
-	testKey := func(keyName string) {
+	for _, keyName := range []key.Name{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
 		// Select 345
 		e.SetCaret(3, 6)
 		if expected, got := "345", e.SelectedText(); expected != got {
@@ -1013,18 +1018,15 @@ func TestSelectMove(t *testing.T) {
 		}
 
 		// Press the key
-		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
+		r.Queue(key.Event{State: key.Press, Name: keyName})
+		gtx.Ops.Reset()
 		e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+		r.Frame(gtx.Ops)
 
 		if expected, got := "", e.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
 		}
 	}
-
-	testKey(key.NameLeftArrow)
-	testKey(key.NameRightArrow)
-	testKey(key.NameUpArrow)
-	testKey(key.NameDownArrow)
 }
 
 func TestEditor_Read(t *testing.T) {
@@ -1077,17 +1079,22 @@ func TestEditor_MaxLen(t *testing.T) {
 	}
 
 	e.SetText("2345678")
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Queue: newQueue(
-			key.EditEvent{Range: key.Range{Start: 0, End: 2}, Text: "1234"},
-			key.SelectionEvent{Start: 4, End: 4},
-		),
+		Source:      r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
+	gtx.Execute(key.FocusCmd{Tag: e})
+	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	r.Queue(
+		key.EditEvent{Range: key.Range{Start: 0, End: 2}, Text: "1234"},
+		key.SelectionEvent{Start: 4, End: 4},
+	)
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 	if got, want := e.Text(), "12345678"; got != want {
@@ -1108,17 +1115,22 @@ func TestEditor_Filter(t *testing.T) {
 	}
 
 	e.SetText("2345678")
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Queue: newQueue(
-			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1"},
-			key.SelectionEvent{Start: 4, End: 4},
-		),
+		Source:      r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
+	gtx.Execute(key.FocusCmd{Tag: e})
+	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	r.Queue(
+		key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1"},
+		key.SelectionEvent{Start: 4, End: 4},
+	)
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
 
 	if got, want := e.Text(), "12345678"; got != want {
@@ -1133,28 +1145,62 @@ func TestEditor_Submit(t *testing.T) {
 	e := new(Editor)
 	e.Submit = true
 
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:         new(op.Ops),
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Queue: newQueue(
-			key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1\n"},
-		),
+		Source:      r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fontSize := unit.Sp(10)
 	font := font.Font{}
+	gtx.Execute(key.FocusCmd{Tag: e})
 	e.Layout(gtx, cache, font, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	r.Queue(
+		key.EditEvent{Range: key.Range{Start: 0, End: 0}, Text: "ab1\n"},
+	)
 
+	got := []EditorEvent{}
+	for {
+		ev, ok := e.Update(gtx)
+		if !ok {
+			break
+		}
+		got = append(got, ev)
+	}
 	if got, want := e.Text(), "ab1"; got != want {
 		t.Errorf("editor failed to filter newline")
 	}
-	got := e.Events()
 	want := []EditorEvent{
 		ChangeEvent{},
 		SubmitEvent{Text: e.Text()},
 	}
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("editor failed to register submit")
+	}
+}
+
+func TestNoFilterAllocs(t *testing.T) {
+	b := testing.Benchmark(func(b *testing.B) {
+		r := new(input.Router)
+		e := new(Editor)
+		gtx := layout.Context{
+			Ops: new(op.Ops),
+			Constraints: layout.Constraints{
+				Max: image.Pt(100, 100),
+			},
+			Locale: english,
+			Source: r.Source(),
+		}
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			e.Update(gtx)
+		}
+	})
+	if allocs := b.AllocsPerOp(); allocs != 0 {
+		t.Fatalf("expected 0 AllocsPerOp, got %d", allocs)
 	}
 }
 
@@ -1176,16 +1222,4 @@ func textWidth(e *Editor, lineNum, colStart, colEnd int) float32 {
 func textBaseline(e *Editor, lineNum int) float32 {
 	start := e.text.closestToLineCol(lineNum, 0)
 	return float32(start.y)
-}
-
-type testQueue struct {
-	events []event.Event
-}
-
-func newQueue(e ...event.Event) *testQueue {
-	return &testQueue{events: e}
-}
-
-func (q *testQueue) Events(_ event.Tag) []event.Event {
-	return q.events
 }

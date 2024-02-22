@@ -7,12 +7,12 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/utopiagio/gio/io/key"
-	
-	"github.com/utopiagio/gio/gpu"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/io/key"
+
+	"github.com/utopiagio/gioui/gio/gpu"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 // errOutOfDate is reported when the GPU surface dimensions or properties no
@@ -137,7 +137,7 @@ func (o Orientation) String() string {
 }
 
 type frameEvent struct {
-	system.FrameEvent
+	FrameEvent
 
 	Sync bool
 }
@@ -165,7 +165,7 @@ type driver interface {
 	// ReadClipboard requests the clipboard content.
 	ReadClipboard()
 	// WriteClipboard requests a clipboard write.
-	WriteClipboard(s string)
+	WriteClipboard(mime string, s []byte)
 	// Configure the window.
 	Configure([]Option)
 	// SetCursor updates the current cursor to name.

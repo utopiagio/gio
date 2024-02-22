@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
 	"runtime"
 	"sort"
 	"strings"
@@ -17,14 +18,15 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/app/internal/windows"
+	"github.com/utopiagio/gioui/gio/unit"
+	gowindows "golang.org/x/sys/windows"
 
-	"github.com/utopiagio/gio/app/internal/windows"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
 )
 
 type ViewEvent struct {
@@ -35,7 +37,7 @@ type window struct {
 	hwnd        syscall.Handle
 	hdc         syscall.Handle
 	w           *callbacks
-	stage       system.Stage
+	stage       Stage
 	pointerBtns pointer.Buttons
 
 	// cursorIn tracks whether the cursor was inside the window according
@@ -83,9 +85,8 @@ func osMain() {
 	select {}
 }
 
-func newWindow(window *callbacks, options []Option) (error) {
+func newWindow(window *callbacks, options []Option) error {
 	cerr := make(chan error)
-
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
 		// then thread-specific messages such as WM_QUIT are ignored.
@@ -186,11 +187,6 @@ func createNativeWindow() (*window, error) {
 // It reads the window style and size/position and updates w.config.
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
-	w.borderSize = image.Pt(
-		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
-		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
-	)
-
 	cr := windows.GetClientRect(w.hwnd)
 	w.config.Size = image.Point{
 		X: int(cr.Right - cr.Left),
@@ -205,6 +201,12 @@ func (w *window) update() {
 	}
 	//log.Println("windows.Rect=(", wr.Left, wr.Top, int(cr.Right - cr.Left), int(cr.Bottom - cr.Top), ")")
 	// *************************************************************************
+
+	w.borderSize = image.Pt(
+		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
+		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
+	)
+
 	w.w.Event(ConfigEvent{Config: w.config})
 }
 
@@ -277,11 +279,11 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.focused = false
 		w.w.Event(key.FocusEvent{Focus: false})
 	case windows.WM_NCACTIVATE:
-		if w.stage >= system.StageInactive {
+		if w.stage >= StageInactive {
 			if wParam == windows.TRUE {
-				w.setStage(system.StageRunning)
+				w.setStage(StageRunning)
 			} else {
-				w.setStage(system.StageInactive)
+				w.setStage(StageInactive)
 			}
 		}
 	case windows.WM_NCHITTEST:
@@ -310,7 +312,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.scrollEvent(wParam, lParam, true, getModifiers())
 	case windows.WM_DESTROY:
 		w.w.Event(ViewEvent{})
-		w.w.Event(system.DestroyEvent{})
+		w.w.Event(DestroyEvent{})
 		if w.hdc != 0 {
 			windows.ReleaseDC(w.hdc)
 			w.hdc = 0
@@ -355,15 +357,15 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		switch wParam {
 		case windows.SIZE_MINIMIZED:
 			w.config.Mode = Minimized
-			w.setStage(system.StagePaused)
+			w.setStage(StagePaused)
 		case windows.SIZE_MAXIMIZED:
 			w.config.Mode = Maximized
-			w.setStage(system.StageRunning)
+			w.setStage(StageRunning)
 		case windows.SIZE_RESTORED:
 			if w.config.Mode != Fullscreen {
 				w.config.Mode = Windowed
 			}
-			w.setStage(system.StageRunning)
+			w.setStage(StageRunning)
 		}
 	case windows.WM_GETMINMAXINFO:
 		mm := (*windows.MinMaxInfo)(unsafe.Pointer(uintptr(lParam)))
@@ -624,10 +626,10 @@ func (w *window) Wakeup() {
 	}
 }
 
-func (w *window) setStage(s system.Stage) {
+func (w *window) setStage(s Stage) {
 	if s != w.stage {
 		w.stage = s
-		w.w.Event(system.StageEvent{Stage: s})
+		w.w.Event(StageEvent{Stage: s})
 	}
 }
 
@@ -638,7 +640,7 @@ func (w *window) draw(sync bool) {
 	dpi := windows.GetWindowDPI(w.hwnd)
 	cfg := configForDPI(dpi)
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Metric: cfg,
@@ -683,8 +685,13 @@ func (w *window) readClipboard() error {
 		return err
 	}
 	defer windows.GlobalUnlock(mem)
-	content := syscall.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
-	w.w.Event(clipboard.Event{Text: content})
+	content := gowindows.UTF16PtrToString((*uint16)(unsafe.Pointer(ptr)))
+	w.w.Event(transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(content))
+		},
+	})
 	return nil
 }
 
@@ -760,8 +767,8 @@ func (w *window) Configure(options []Option) {
 	w.update()
 }
 
-func (w *window) WriteClipboard(s string) {
-	w.writeClipboard(s)
+func (w *window) WriteClipboard(mime string, s []byte) {
+	w.writeClipboard(string(s))
 }
 
 func (w *window) writeClipboard(s string) error {
@@ -772,7 +779,7 @@ func (w *window) writeClipboard(s string) error {
 	if err := windows.EmptyClipboard(); err != nil {
 		return err
 	}
-	u16, err := syscall.UTF16FromString(s)
+	u16, err := gowindows.UTF16FromString(s)
 	if err != nil {
 		return err
 	}
@@ -889,11 +896,11 @@ func (w *window) raise() {
 		windows.SWP_NOMOVE|windows.SWP_NOSIZE|windows.SWP_SHOWWINDOW)
 }
 
-func convertKeyCode(code uintptr) (string, bool) {
+func convertKeyCode(code uintptr) (key.Name, bool) {
 	if '0' <= code && code <= '9' || 'A' <= code && code <= 'Z' {
-		return string(rune(code)), true
+		return key.Name(rune(code)), true
 	}
-	var r string
+	var r key.Name
 
 	switch code {
 	case windows.VK_ESCAPE:

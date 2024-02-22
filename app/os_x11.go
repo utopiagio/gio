@@ -30,21 +30,23 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/unit"
+
 	syscall "golang.org/x/sys/unix"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
-
-	"github.com/utopiagio/gio/app/internal/xkb"
+	"github.com/utopiagio/gioui/gio/app/internal/xkb"
 )
 
 const (
@@ -91,7 +93,7 @@ type x11Window struct {
 		// _NET_WM_STATE_MAXIMIZED_VERT
 		wmStateMaximizedVert C.Atom
 	}
-	stage  system.Stage
+	stage  Stage
 	metric unit.Metric
 	notify struct {
 		read, write int
@@ -151,8 +153,8 @@ func (w *x11Window) ReadClipboard() {
 	C.XConvertSelection(w.x, w.atoms.clipboard, w.atoms.utf8string, w.atoms.clipboardContent, w.xw, C.CurrentTime)
 }
 
-func (w *x11Window) WriteClipboard(s string) {
-	w.clipboard.content = []byte(s)
+func (w *x11Window) WriteClipboard(mime string, s []byte) {
+	w.clipboard.content = s
 	C.XSetSelectionOwner(w.x, w.atoms.clipboard, w.xw, C.CurrentTime)
 	C.XSetSelectionOwner(w.x, w.atoms.primary, w.xw, C.CurrentTime)
 }
@@ -209,13 +211,6 @@ func (w *x11Window) Configure(options []Option) {
 			w.sendWMStateEvent(_NET_WM_STATE_REMOVE, w.atoms.wmStateMaximizedHorz, w.atoms.wmStateMaximizedVert)
 		}
 		w.setTitle(prev, cnf)
-		// **************************************************************************
-		// ************ RNW Added config pos change to X11 28.01.2024 ***************
-		if prev.Pos != cnf.Pos {
-			w.config.Pos = cnf.Pos
-			C.XMoveWindow(w.x, w.xw, C.int(cnf.Pos.X), C.int(cnf.Pos.Y))
-		}
-		// **************************************************************************
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
 			C.XResizeWindow(w.x, w.xw, C.uint(cnf.Size.X), C.uint(cnf.Size.Y))
@@ -400,12 +395,12 @@ func (w *x11Window) window() (C.Window, int, int) {
 	return w.xw, w.config.Size.X, w.config.Size.Y
 }
 
-func (w *x11Window) setStage(s system.Stage) {
+func (w *x11Window) setStage(s Stage) {
 	if s == w.stage {
 		return
 	}
 	w.stage = s
-	w.w.Event(system.StageEvent{Stage: s})
+	w.w.Event(StageEvent{Stage: s})
 }
 
 func (w *x11Window) loop() {
@@ -465,7 +460,7 @@ loop:
 
 		if (anim || syn) && w.config.Size.X != 0 && w.config.Size.Y != 0 {
 			w.w.Event(frameEvent{
-				FrameEvent: system.FrameEvent{
+				FrameEvent: FrameEvent{
 					Now:    time.Now(),
 					Size:   w.config.Size,
 					Metric: w.metric,
@@ -633,17 +628,10 @@ func (h *x11EventHandler) handleEvents() bool {
 			w.w.Event(key.FocusEvent{Focus: false})
 		case C.ConfigureNotify: // window configuration change
 			cevt := (*C.XConfigureEvent)(unsafe.Pointer(xev))
-			// **************************************************************************
-			// ************ RNW Added pos to ConfigureNotify 28.01.2024 *****************
-			// expose event for redraw after move event is delayed till mouse release****
 			if sz := image.Pt(int(cevt.width), int(cevt.height)); sz != w.config.Size {
 				w.config.Size = sz
 				w.w.Event(ConfigEvent{Config: w.config})
-			} else if pos := image.Pt(int(cevt.x), int(cevt.y)); pos != w.config.Pos {
-				w.config.Pos = pos
-				w.w.Event(ConfigEvent{Config: w.config})
 			}
-			// **************************************************************************
 			// redraw will be done by a later expose event
 		case C.SelectionNotify:
 			cevt := (*C.XSelectionEvent)(unsafe.Pointer(xev))
@@ -664,7 +652,12 @@ func (h *x11EventHandler) handleEvents() bool {
 				break
 			}
 			str := C.GoStringN((*C.char)(unsafe.Pointer(text.value)), C.int(text.nitems))
-			w.w.Event(clipboard.Event{Text: str})
+			w.w.Event(transfer.DataEvent{
+				Type: "application/text",
+				Open: func() io.ReadCloser {
+					return io.NopCloser(strings.NewReader(str))
+				},
+			})
 		case C.SelectionRequest:
 			cevt := (*C.XSelectionRequestEvent)(unsafe.Pointer(xev))
 			if (cevt.selection != w.atoms.clipboard && cevt.selection != w.atoms.primary) || cevt.property == C.None {
@@ -844,10 +837,10 @@ func newX11Window(gioWin *callbacks, options []Option) error {
 		C.XMapWindow(dpy, win)
 		w.Configure(options)
 		w.w.Event(X11ViewEvent{Display: unsafe.Pointer(dpy), Window: uintptr(win)})
-		w.setStage(system.StageRunning)
+		w.setStage(StageRunning)
 		w.loop()
 		w.w.Event(X11ViewEvent{})
-		w.w.Event(system.DestroyEvent{Err: nil})
+		w.w.Event(DestroyEvent{Err: nil})
 		w.destroy()
 	}()
 	return nil

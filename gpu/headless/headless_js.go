@@ -6,8 +6,8 @@ import (
 	"errors"
 	"syscall/js"
 
-	"github.com/utopiagio/gio/gpu"
-	"github.com/utopiagio/gio/internal/gl"
+	"github.com/utopiagio/gioui/gio/gpu"
+	"github.com/utopiagio/gioui/gio/internal/gl"
 )
 
 type jsContext struct {

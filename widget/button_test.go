@@ -6,22 +6,23 @@ import (
 	"image"
 	"testing"
 
-	"gioui.org/io/key"
-	"gioui.org/io/router"
-	"gioui.org/io/system"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/widget"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 func TestClickable(t *testing.T) {
 	var (
-		ops op.Ops
-		r   router.Router
-		b1  widget.Clickable
-		b2  widget.Clickable
+		r  input.Router
+		b1 widget.Clickable
+		b2 widget.Clickable
 	)
-	gtx := layout.NewContext(&ops, system.FrameEvent{Queue: &r})
+	gtx := layout.Context{
+		Ops:    new(op.Ops),
+		Source: r.Source(),
+	}
 	layout := func() {
 		b1.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			return layout.Dimensions{Size: image.Pt(100, 100)}
@@ -32,23 +33,18 @@ func TestClickable(t *testing.T) {
 		})
 	}
 	frame := func() {
-		ops.Reset()
+		gtx.Reset()
 		layout()
 		r.Frame(gtx.Ops)
 	}
-	// frame: request focus for button 1
-	b1.Focus()
+	gtx.Execute(key.FocusCmd{Tag: &b1})
 	frame()
-	// frame: gain focus for button 1
-	frame()
-	if !b1.Focused() {
+	if !gtx.Focused(&b1) {
 		t.Error("button 1 did not gain focus")
 	}
-	if b2.Focused() {
+	if gtx.Focused(&b2) {
 		t.Error("button 2 should not have focus")
 	}
-	// frame: press & release return
-	frame()
 	r.Queue(
 		key.Event{
 			Name:  key.NameReturn,
@@ -65,36 +61,30 @@ func TestClickable(t *testing.T) {
 	if b2.Clicked(gtx) {
 		t.Error("button 2 got clicked when it did not have focus")
 	}
-	// frame: press return down
 	r.Queue(
 		key.Event{
 			Name:  key.NameReturn,
 			State: key.Press,
 		},
 	)
-	frame()
 	if b1.Clicked(gtx) {
 		t.Error("button 1 got clicked, even if it only got return press")
 	}
-	// frame: request focus for button 2
-	b2.Focus()
 	frame()
-	// frame: gain focus for button 2
+	gtx.Execute(key.FocusCmd{Tag: &b2})
 	frame()
-	if b1.Focused() {
+	if gtx.Focused(&b1) {
 		t.Error("button 1 should not have focus")
 	}
-	if !b2.Focused() {
+	if !gtx.Focused(&b2) {
 		t.Error("button 2 did not gain focus")
 	}
-	// frame: release return
 	r.Queue(
 		key.Event{
 			Name:  key.NameReturn,
 			State: key.Release,
 		},
 	)
-	frame()
 	if b1.Clicked(gtx) {
 		t.Error("button 1 got clicked, even if it had lost focus")
 	}

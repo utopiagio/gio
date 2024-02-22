@@ -123,27 +123,29 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"runtime/cgo"
 	"runtime/debug"
+	"strings"
 	"sync"
 	"time"
 	"unicode/utf16"
 	"unsafe"
 
-	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/semantic"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 type window struct {
@@ -156,7 +158,7 @@ type window struct {
 	fontScale float32
 	insets    pixelInsets
 
-	stage     system.Stage
+	stage     Stage
 	started   bool
 	animating bool
 
@@ -164,10 +166,10 @@ type window struct {
 	config Config
 
 	semantic struct {
-		hoverID router.SemanticID
-		rootID  router.SemanticID
-		focusID router.SemanticID
-		diffs   []router.SemanticID
+		hoverID input.SemanticID
+		rootID  input.SemanticID
+		focusID input.SemanticID
+		diffs   []input.SemanticID
 	}
 }
 
@@ -501,7 +503,7 @@ func Java_org_gioui_GioView_onCreateView(env *C.JNIEnv, class C.jclass, view C.j
 	w.loadConfig(env, class)
 	w.Configure(wopts.options)
 	w.SetInputHint(key.HintAny)
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 	w.callbacks.Event(ViewEvent{View: uintptr(view)})
 	return C.jlong(w.handle)
 }
@@ -516,7 +518,7 @@ func Java_org_gioui_GioView_onDestroyView(env *C.JNIEnv, class C.jclass, handle 
 func Java_org_gioui_GioView_onStopView(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.started = false
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 }
 
 //export Java_org_gioui_GioView_onStartView
@@ -532,7 +534,7 @@ func Java_org_gioui_GioView_onStartView(env *C.JNIEnv, class C.jclass, handle C.
 func Java_org_gioui_GioView_onSurfaceDestroyed(env *C.JNIEnv, class C.jclass, handle C.jlong) {
 	w := cgo.Handle(handle).Value().(*window)
 	w.win = nil
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 }
 
 //export Java_org_gioui_GioView_onSurfaceChanged
@@ -554,7 +556,7 @@ func Java_org_gioui_GioView_onLowMemory(env *C.JNIEnv, class C.jclass) {
 func Java_org_gioui_GioView_onConfigurationChanged(env *C.JNIEnv, class C.jclass, view C.jlong) {
 	w := cgo.Handle(view).Value().(*window)
 	w.loadConfig(env, class)
-	if w.stage >= system.StageInactive {
+	if w.stage >= StageInactive {
 		w.draw(env, true)
 	}
 }
@@ -565,7 +567,7 @@ func Java_org_gioui_GioView_onFrameCallback(env *C.JNIEnv, class C.jclass, view 
 	if !exist {
 		return
 	}
-	if w.stage < system.StageInactive {
+	if w.stage < StageInactive {
 		return
 	}
 	if w.animating {
@@ -598,7 +600,7 @@ func Java_org_gioui_GioView_onWindowInsets(env *C.JNIEnv, class C.jclass, view C
 		left:   int(left),
 		right:  int(right),
 	}
-	if w.stage >= system.StageInactive {
+	if w.stage >= StageInactive {
 		w.draw(env, true)
 	}
 }
@@ -661,7 +663,7 @@ func Java_org_gioui_GioView_onClearA11yFocus(env *C.JNIEnv, class C.jclass, view
 	}
 }
 
-func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNode, off image.Point, info C.jobject) error {
+func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem input.SemanticNode, off image.Point, info C.jobject) error {
 	for _, ch := range sem.Children {
 		err := callVoidMethod(env, info, android.accessibilityNodeInfo.addChild, jvalue(w.view), jvalue(w.virtualIDFor(ch.ID)))
 		if err != nil {
@@ -704,7 +706,7 @@ func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNod
 			panic(err)
 		}
 	}
-	if d.Gestures&router.ClickGesture != 0 {
+	if d.Gestures&input.ClickGesture != 0 {
 		addAction(ACTION_CLICK)
 	}
 	clsName := android.strings.androidViewView
@@ -749,19 +751,18 @@ func (w *window) initAccessibilityNodeInfo(env *C.JNIEnv, sem router.SemanticNod
 	return nil
 }
 
-func (w *window) virtualIDFor(id router.SemanticID) C.jint {
-	// TODO: Android virtual IDs are 32-bit Java integers, but childID is a int64.
+func (w *window) virtualIDFor(id input.SemanticID) C.jint {
 	if id == w.semantic.rootID {
 		return HOST_VIEW_ID
 	}
 	return C.jint(id)
 }
 
-func (w *window) semIDFor(virtID C.jint) router.SemanticID {
+func (w *window) semIDFor(virtID C.jint) input.SemanticID {
 	if virtID == HOST_VIEW_ID {
 		return w.semantic.rootID
 	}
-	return router.SemanticID(virtID)
+	return input.SemanticID(virtID)
 }
 
 func (w *window) detach(env *C.JNIEnv) {
@@ -778,16 +779,16 @@ func (w *window) setVisible(env *C.JNIEnv) {
 	if width == 0 || height == 0 {
 		return
 	}
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 	w.draw(env, true)
 }
 
-func (w *window) setStage(stage system.Stage) {
+func (w *window) setStage(stage Stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.callbacks.Event(system.StageEvent{stage})
+	w.callbacks.Event(StageEvent{stage})
 }
 
 func (w *window) setVisual(visID int) error {
@@ -837,14 +838,14 @@ func (w *window) draw(env *C.JNIEnv, sync bool) {
 	const inchPrDp = 1.0 / 160
 	ppdp := float32(w.dpi) * inchPrDp
 	dppp := unit.Dp(1.0 / ppdp)
-	insets := system.Insets{
+	insets := Insets{
 		Top:    unit.Dp(w.insets.top) * dppp,
 		Bottom: unit.Dp(w.insets.bottom) * dppp,
 		Left:   unit.Dp(w.insets.left) * dppp,
 		Right:  unit.Dp(w.insets.right) * dppp,
 	}
 	w.callbacks.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Insets: insets,
@@ -898,8 +899,8 @@ func runInJVM(jvm *C.JavaVM, f func(env *C.JNIEnv)) {
 	f(env)
 }
 
-func convertKeyCode(code C.jint) (string, bool) {
-	var n string
+func convertKeyCode(code C.jint) (key.Name, bool) {
+	var n key.Name
 	switch code {
 	case C.AKEYCODE_FORWARD_DEL:
 		n = key.NameDeleteForward
@@ -1296,9 +1297,9 @@ func newWindow(window *callbacks, options []Option) error {
 	return <-mainWindow.errs
 }
 
-func (w *window) WriteClipboard(s string) {
+func (w *window) WriteClipboard(mime string, s []byte) {
 	runInJVM(javaVM(), func(env *C.JNIEnv) {
-		jstr := javaString(env, s)
+		jstr := javaString(env, string(s))
 		callStaticVoidMethod(env, android.gioCls, android.mwriteClipboard,
 			jvalue(android.appCtx), jvalue(jstr))
 	})
@@ -1312,7 +1313,12 @@ func (w *window) ReadClipboard() {
 			return
 		}
 		content := goString(env, C.jstring(c))
-		w.callbacks.Event(clipboard.Event{Text: content})
+		w.callbacks.Event(transfer.DataEvent{
+			Type: "application/text",
+			Open: func() io.ReadCloser {
+				return io.NopCloser(strings.NewReader(content))
+			},
+		})
 	})
 }
 

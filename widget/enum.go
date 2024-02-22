@@ -3,13 +3,14 @@
 package widget
 
 import (
-	"github.com/utopiagio/gio/gesture"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/gesture"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/semantic"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
 )
 
 type Enum struct {
@@ -40,17 +41,21 @@ func (e *Enum) index(k string) *enumKey {
 
 // Update the state and report whether Value has changed by user interaction.
 func (e *Enum) Update(gtx layout.Context) bool {
-	if gtx.Queue == nil {
+	if !gtx.Enabled() {
 		e.focused = false
 	}
 	e.hovering = false
 	changed := false
 	for _, state := range e.keys {
-		for _, ev := range state.click.Update(gtx) {
+		for {
+			ev, ok := state.click.Update(gtx.Source)
+			if !ok {
+				break
+			}
 			switch ev.Kind {
 			case gesture.KindPress:
 				if ev.Source == pointer.Mouse {
-					key.FocusOp{Tag: &state.tag}.Add(gtx.Ops)
+					gtx.Execute(key.FocusCmd{Tag: &state.tag})
 				}
 			case gesture.KindClick:
 				if state.key != e.Value {
@@ -59,7 +64,15 @@ func (e *Enum) Update(gtx layout.Context) bool {
 				}
 			}
 		}
-		for _, ev := range gtx.Events(&state.tag) {
+		for {
+			ev, ok := gtx.Event(
+				key.FocusFilter{Target: &state.tag},
+				key.Filter{Focus: &state.tag, Name: key.NameReturn},
+				key.Filter{Focus: &state.tag, Name: key.NameSpace},
+			)
+			if !ok {
+				break
+			}
 			switch ev := ev.(type) {
 			case key.FocusEvent:
 				if ev.Focus {
@@ -69,7 +82,7 @@ func (e *Enum) Update(gtx layout.Context) bool {
 					e.focused = false
 				}
 			case key.Event:
-				if !e.focused || ev.State != key.Release {
+				if ev.State != key.Release {
 					break
 				}
 				if ev.Name != key.NameReturn && ev.Name != key.NameSpace {
@@ -117,12 +130,9 @@ func (e *Enum) Layout(gtx layout.Context, k string, content layout.Widget) layou
 	}
 	clk := &state.click
 	clk.Add(gtx.Ops)
-	enabled := gtx.Queue != nil
-	if enabled {
-		key.InputOp{Tag: &state.tag, Keys: "⏎|Space"}.Add(gtx.Ops)
-	}
+	event.Op(gtx.Ops, &state.tag)
 	semantic.SelectedOp(k == e.Value).Add(gtx.Ops)
-	semantic.EnabledOp(enabled).Add(gtx.Ops)
+	semantic.EnabledOp(gtx.Enabled()).Add(gtx.Ops)
 	c.Add(gtx.Ops)
 
 	return dims

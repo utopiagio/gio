@@ -12,9 +12,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/utopiagio/gio/gpu/internal/driver"
-	"github.com/utopiagio/gio/internal/byteslice"
-	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/gpu/internal/driver"
+	"github.com/utopiagio/gioui/gio/internal/byteslice"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
 	"gioui.org/shader"
 	"gioui.org/shader/gio"
 )

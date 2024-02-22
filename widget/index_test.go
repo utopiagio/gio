@@ -6,14 +6,9 @@ import (
 	"testing"
 
 	nsareg "eliasnaur.com/font/noto/sans/arabic/regular"
-
-	"github.com/utopiagio/gio/font/opentype"
-	"github.com/utopiagio/gio/text"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/font/opentype"
-	//"gioui.org/text"
-
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/font/opentype"
+	"github.com/utopiagio/gioui/gio/text"
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 )

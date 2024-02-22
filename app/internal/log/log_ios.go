@@ -22,7 +22,7 @@ import (
 	"log"
 	"unsafe"
 
-	_ "github.com/utopiagio/gio/internal/cocoainit"
+	_ "github.com/utopiagio/gioui/gio/internal/cocoainit"
 )
 
 func init() {

@@ -6,23 +6,15 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/internal/f32color"
-	//"gioui.org/layout"
-	"github.com/utopiagio/gio/op"
-	//"gioui.org/op/clip"
-	//"gioui.org/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 type checkable struct {
@@ -68,7 +60,7 @@ func (c *checkable) layout(gtx layout.Context, checked, hovered bool) layout.Dim
 					return layout.UniformInset(2).Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 						size := gtx.Dp(c.Size)
 						col := c.IconColor
-						if gtx.Queue == nil {
+						if !gtx.Enabled() {
 							col = f32color.Disabled(col)
 						}
 						gtx.Constraints.Min = image.Point{X: size}

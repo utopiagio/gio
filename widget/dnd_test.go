@@ -4,37 +4,38 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/io/transfer"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
 )
 
 func TestDraggable(t *testing.T) {
-	var r router.Router
+	var r input.Router
 	gtx := layout.Context{
 		Constraints: layout.Exact(image.Pt(100, 100)),
-		Queue:       &r,
+		Source:      r.Source(),
 		Ops:         new(op.Ops),
 	}
 
 	drag := &Draggable{
 		Type: "file",
 	}
+	tgt := new(int)
 	defer pointer.PassOp{}.Push(gtx.Ops).Pop()
 	dims := drag.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 		return layout.Dimensions{Size: gtx.Constraints.Min}
 	}, nil)
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
-	transfer.TargetOp{
-		Tag:  drag,
-		Type: drag.Type,
-	}.Add(gtx.Ops)
+	event.Op(gtx.Ops, tgt)
 	stack.Pop()
 
+	drag.Update(gtx)
+	r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
 	r.Frame(gtx.Ops)
 	r.Queue(
 		pointer.Event{
@@ -51,20 +52,27 @@ func TestDraggable(t *testing.T) {
 		},
 	)
 	ofr := &offer{data: "hello"}
-	drag.Offer(gtx.Ops, "file", ofr)
-	r.Frame(gtx.Ops)
+	drag.Update(gtx)
+	r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
+	drag.Offer(gtx, "file", ofr)
 
-	evs := r.Events(drag)
-	if len(evs) != 1 {
-		t.Fatalf("expected 1 event, got %d", len(evs))
+	e, ok := r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
+	if !ok {
+		t.Fatalf("expected event")
 	}
-	ev := evs[0].(transfer.DataEvent)
-	ev.Open = nil
+	ev := e.(transfer.DataEvent)
 	if got, want := ev.Type, "file"; got != want {
 		t.Errorf("expected %v; got %v", got, want)
 	}
 	if ofr.closed {
 		t.Error("offer closed prematurely")
+	}
+	e, ok = r.Event(transfer.TargetFilter{Target: tgt, Type: drag.Type})
+	if !ok {
+		t.Fatalf("expected event")
+	}
+	if _, ok := e.(transfer.CancelEvent); !ok {
+		t.Fatalf("expected transfer.CancelEvent event")
 	}
 	r.Frame(gtx.Ops)
 	if !ofr.closed {

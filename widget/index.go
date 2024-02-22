@@ -9,12 +9,8 @@ import (
 	"math"
 	"sort"
 
-
-	"github.com/utopiagio/gio/text"
-
-	//"gioui.org/text"
+	"github.com/utopiagio/gioui/gio/text"
 	"github.com/go-text/typesetting/segmenter"
-
 	"golang.org/x/image/math/fixed"
 )
 
@@ -350,10 +346,6 @@ type Region struct {
 	// the bottom of bounds.
 	Baseline int
 }
-
-// region is identical to Region except that its coordinates are in document
-// space instead of a widget coordinate space.
-type region = Region
 
 // locate returns highlight regions covering the glyphs that represent the runes in
 // [startRune,endRune). If the rects parameter is non-nil, locate will use it to

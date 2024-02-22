@@ -6,9 +6,9 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/paint"
 )
 
 func TestImageScale(t *testing.T) {

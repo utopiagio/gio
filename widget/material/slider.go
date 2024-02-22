@@ -6,13 +6,13 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 // Slider is for selecting a value in a range.
@@ -56,7 +56,7 @@ func (s SliderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	trans.Pop()
 
 	color := s.Color
-	if gtx.Queue == nil {
+	if !gtx.Enabled() {
 		color = f32color.Disabled(color)
 	}
 

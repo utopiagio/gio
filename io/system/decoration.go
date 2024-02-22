@@ -3,8 +3,8 @@ package system
 import (
 	"strings"
 
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 // ActionAreaOp makes the current clip area available for

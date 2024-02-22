@@ -6,11 +6,11 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/event"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 func TestListPositionExtremes(t *testing.T) {
@@ -64,13 +64,13 @@ func TestListScrollToEnd(t *testing.T) {
 
 func TestListPosition(t *testing.T) {
 	_s := func(e ...event.Event) []event.Event { return e }
-	r := new(router.Router)
+	r := new(input.Router)
 	gtx := Context{
 		Ops: new(op.Ops),
 		Constraints: Constraints{
 			Max: image.Pt(20, 10),
 		},
-		Queue: r,
+		Source: r.Source(),
 	}
 	el := func(gtx Context, idx int) Dimensions {
 		return Dimensions{Size: image.Pt(10, 10)}

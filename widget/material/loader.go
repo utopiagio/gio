@@ -8,11 +8,11 @@ import (
 	"math"
 	"time"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
 )
 
 type LoaderStyle struct {
@@ -47,7 +47,7 @@ func (l LoaderStyle) Layout(gtx layout.Context) layout.Dimensions {
 	}.Add(gtx.Ops)
 	defer op.Offset(image.Pt(-radius, -radius)).Push(gtx.Ops).Pop()
 	paint.PaintOp{}.Add(gtx.Ops)
-	op.InvalidateOp{}.Add(gtx.Ops)
+	gtx.Execute(op.InvalidateCmd{})
 	return layout.Dimensions{
 		Size: sz,
 	}

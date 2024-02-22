@@ -72,18 +72,20 @@ import "C"
 
 import (
 	"image"
+	"io"
 	"runtime"
 	"runtime/debug"
+	"strings"
 	"time"
 	"unicode/utf16"
 	"unsafe"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 type ViewEvent struct {
@@ -129,7 +131,7 @@ func onCreate(view, controller C.CFTypeRef) {
 	w.w.SetDriver(w)
 	views[view] = w
 	w.Configure(wopts.options)
-	w.w.Event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(StageEvent{Stage: StagePaused})
 	w.w.Event(ViewEvent{ViewController: uintptr(controller)})
 }
 
@@ -147,7 +149,7 @@ func (w *window) draw(sync bool) {
 	wasVisible := w.visible
 	w.visible = true
 	if !wasVisible {
-		w.w.Event(system.StageEvent{Stage: system.StageRunning})
+		w.w.Event(StageEvent{Stage: StageRunning})
 	}
 	const inchPrDp = 1.0 / 163
 	m := unit.Metric{
@@ -156,13 +158,13 @@ func (w *window) draw(sync bool) {
 	}
 	dppp := unit.Dp(1. / m.PxPerDp)
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now: time.Now(),
 			Size: image.Point{
 				X: int(params.width + .5),
 				Y: int(params.height + .5),
 			},
-			Insets: system.Insets{
+			Insets: Insets{
 				Top:    unit.Dp(params.top) * dppp,
 				Bottom: unit.Dp(params.bottom) * dppp,
 				Left:   unit.Dp(params.left) * dppp,
@@ -178,7 +180,7 @@ func (w *window) draw(sync bool) {
 func onStop(view C.CFTypeRef) {
 	w := views[view]
 	w.visible = false
-	w.w.Event(system.StageEvent{Stage: system.StagePaused})
+	w.w.Event(StageEvent{Stage: StagePaused})
 }
 
 //export onDestroy
@@ -186,7 +188,7 @@ func onDestroy(view C.CFTypeRef) {
 	w := views[view]
 	delete(views, view)
 	w.w.Event(ViewEvent{})
-	w.w.Event(system.DestroyEvent{})
+	w.w.Event(DestroyEvent{})
 	w.displayLink.Close()
 	w.view = 0
 }
@@ -265,11 +267,16 @@ func (w *window) ReadClipboard() {
 	cstr := C.readClipboard()
 	defer C.CFRelease(cstr)
 	content := nsstringToString(cstr)
-	w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(content))
+		},
+	})
 }
 
-func (w *window) WriteClipboard(s string) {
-	u16 := utf16.Encode([]rune(s))
+func (w *window) WriteClipboard(mime string, s []byte) {
+	u16 := utf16.Encode([]rune(string(s)))
 	var chars *C.unichar
 	if len(u16) > 0 {
 		chars = (*C.unichar)(unsafe.Pointer(&u16[0]))
@@ -303,7 +310,7 @@ func (w *window) SetCursor(cursor pointer.Cursor) {
 	w.cursor = windowSetCursor(w.cursor, cursor)
 }
 
-func (w *window) onKeyCommand(name string) {
+func (w *window) onKeyCommand(name key.Name) {
 	w.w.Event(key.Event{
 		Name: name,
 	})

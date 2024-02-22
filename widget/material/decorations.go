@@ -4,15 +4,15 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/semantic"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 // DecorationsStyle provides the style elements for Decorations.

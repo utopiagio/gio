@@ -7,26 +7,16 @@ import (
 	"image/color"
 	"math"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/internal/f32color"
-	//"gioui.org/io/semantic"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/op/clip"
-	//"gioui.org/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/io/semantic"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 type ButtonStyle struct {
@@ -106,7 +96,7 @@ func Clickable(gtx layout.Context, button *widget.Clickable, w layout.Widget) la
 		return layout.Background{}.Layout(gtx,
 			func(gtx layout.Context) layout.Dimensions {
 				defer clip.Rect{Max: gtx.Constraints.Min}.Push(gtx.Ops).Pop()
-				if button.Hovered() || button.Focused() {
+				if button.Hovered() || gtx.Focused(button) {
 					paint.Fill(gtx.Ops, f32color.Hovered(color.NRGBA{}))
 				}
 				for _, c := range button.History() {
@@ -143,9 +133,9 @@ func (b ButtonLayoutStyle) Layout(gtx layout.Context, w layout.Widget) layout.Di
 				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
-				case gtx.Queue == nil:
+				case !gtx.Enabled():
 					background = f32color.Disabled(b.Background)
-				case b.Button.Hovered() || b.Button.Focused():
+				case b.Button.Hovered() || gtx.Focused(b.Button):
 					background = f32color.Hovered(b.Background)
 				}
 				paint.Fill(gtx.Ops, background)
@@ -175,9 +165,9 @@ func (b IconButtonStyle) Layout(gtx layout.Context) layout.Dimensions {
 				defer clip.UniformRRect(image.Rectangle{Max: gtx.Constraints.Min}, rr).Push(gtx.Ops).Pop()
 				background := b.Background
 				switch {
-				case gtx.Queue == nil:
+				case !gtx.Enabled():
 					background = f32color.Disabled(b.Background)
-				case b.Button.Hovered() || b.Button.Focused():
+				case b.Button.Hovered() || gtx.Focused(b.Button):
 					background = f32color.Hovered(b.Background)
 				}
 				paint.Fill(gtx.Ops, background)
@@ -268,7 +258,7 @@ func drawInk(gtx layout.Context, c widget.Press) {
 
 	// Animate only ended presses, and presses that are fading in.
 	if !c.End.IsZero() || sizet <= 1.0 {
-		op.InvalidateOp{}.Add(gtx.Ops)
+		gtx.Execute(op.InvalidateCmd{})
 	}
 
 	if sizet > 1.0 {

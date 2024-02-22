@@ -7,52 +7,30 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	//"log"
 	"runtime"
 	"time"
 	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 
-	//syscall "golang.org/x/sys/windows"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/font/gofont"
+	"github.com/utopiagio/gioui/gio/gpu"
+	"github.com/utopiagio/gioui/gio/internal/debug"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
+	"github.com/utopiagio/gioui/gio/widget/material"
 
-	"github.com/utopiagio/gio/f32"
-	//"github.com/utopiagio/gio/font/opentype"
-	"github.com/utopiagio/gio/gpu"
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/io/event"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/profile"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
-	"github.com/utopiagio/gio/widget/material"
-	//"golang.org/x/image/font/gofont/goregular"
-
-	//"gioui.org/f32"
-	"github.com/utopiagio/gio/font/gofont"
-	//"gioui.org/gpu"
-	"github.com/utopiagio/gio/internal/debug"
-	//"gioui.org/internal/ops"
-	//"gioui.org/io/event"
-	//"gioui.org/io/key"
-	//"gioui.org/io/pointer"
-	//"gioui.org/io/profile"
-	//"gioui.org/io/router"
-	//"gioui.org/io/system"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
-	//"gioui.org/widget/material"
-
-	_ "github.com/utopiagio/gio/app/internal/log"
+	_ "github.com/utopiagio/gioui/gio/app/internal/log"
 )
 
 // Option configures a window.
@@ -89,7 +67,7 @@ type Window struct {
 	frameAck chan struct{}
 	destroy  chan struct{}
 
-	stage        system.Stage
+	stage        Stage
 	animating    bool
 	hasNextFrame bool
 	nextFrame    time.Time
@@ -98,7 +76,7 @@ type Window struct {
 	// metric is the metric from the most recent frame.
 	metric unit.Metric
 
-	queue       queue
+	queue       input.Router
 	cursor      pointer.Cursor
 	decorations struct {
 		op.Ops
@@ -113,7 +91,6 @@ type Window struct {
 		*material.Theme
 		*widget.Decorations
 	}
-	//hWnd syscall.Handle	// RNW Added parameter hWnd to store window handle
 
 	callbacks callbacks
 
@@ -124,10 +101,10 @@ type Window struct {
 	semantic struct {
 		// uptodate tracks whether the fields below are up to date.
 		uptodate bool
-		root     router.SemanticID
-		prevTree []router.SemanticNode
-		tree     []router.SemanticNode
-		ids      map[router.SemanticID]router.SemanticNode
+		root     input.SemanticID
+		prevTree []input.SemanticNode
+		tree     []input.SemanticNode
+		ids      map[input.SemanticID]input.SemanticNode
 	}
 
 	imeState editorState
@@ -144,7 +121,7 @@ type Window struct {
 }
 
 type editorState struct {
-	router.EditorState
+	input.EditorState
 	compose key.Range
 }
 
@@ -153,12 +130,6 @@ type callbacks struct {
 	d          driver
 	busy       bool
 	waitEvents []event.Event
-}
-
-// queue is an event.Queue implementation that distributes system events
-// to the input handlers declared in the most recent frame.
-type queue struct {
-	q router.Router
 }
 
 // NewWindow creates a new window for a set of window
@@ -218,7 +189,7 @@ func NewWindow(options ...Option) *Window {
 	w.decorations.enabled = cnf.Decorated
 	w.decorations.height = decoHeight
 	w.imeState.compose = key.Range{Start: -1, End: -1}
-	w.semantic.ids = make(map[router.SemanticID]router.SemanticNode)
+	w.semantic.ids = make(map[input.SemanticID]input.SemanticNode)
 	w.callbacks.w = w
 	w.eventState.initialOpts = options
 	return w
@@ -303,7 +274,7 @@ func (w *Window) validateAndProcess(d driver, size image.Point, sync bool, frame
 				return err
 			}
 		}
-		w.queue.q.Frame(frame)
+		w.queue.Frame(frame)
 		// Let the client continue as soon as possible, in particular before
 		// a potentially blocking Present.
 		signal()
@@ -331,25 +302,25 @@ func (w *Window) frame(frame *op.Ops, viewport image.Point) error {
 	return w.gpu.Frame(frame, target, viewport)
 }
 
-func (w *Window) processFrame(d driver, frameStart time.Time) {
+func (w *Window) processFrame(d driver) {
 	for k := range w.semantic.ids {
 		delete(w.semantic.ids, k)
 	}
 	w.semantic.uptodate = false
-	q := &w.queue.q
+	q := &w.queue
 	switch q.TextInputState() {
-	case router.TextInputOpen:
+	case input.TextInputOpen:
 		d.ShowTextInput(true)
-	case router.TextInputClose:
+	case input.TextInputClose:
 		d.ShowTextInput(false)
 	}
 	if hint, ok := q.TextInputHint(); ok {
 		d.SetInputHint(hint)
 	}
-	if txt, ok := q.WriteClipboard(); ok {
-		d.WriteClipboard(txt)
+	if mime, txt, ok := q.WriteClipboard(); ok {
+		d.WriteClipboard(mime, txt)
 	}
-	if q.ReadClipboard() {
+	if q.ClipboardRequested() {
 		d.ReadClipboard()
 	}
 	oldState := w.imeState
@@ -359,29 +330,21 @@ func (w *Window) processFrame(d driver, frameStart time.Time) {
 		w.imeState = newState
 		d.EditorStateChanged(oldState, newState)
 	}
-	if q.Profiling() && w.gpu != nil {
-		frameDur := time.Since(frameStart)
-		frameDur = frameDur.Truncate(100 * time.Microsecond)
-		quantum := 100 * time.Microsecond
-		timings := fmt.Sprintf("tot:%7s %s", frameDur.Round(quantum), w.gpu.Profile())
-		q.Queue(profile.Event{Timings: timings})
-	}
 	if t, ok := q.WakeupTime(); ok {
 		w.setNextFrame(t)
 	}
 	w.updateAnimation(d)
 }
 
-// Invalidate the window such that a FrameEvent will be generated immediately.
+// Invalidate the window such that a [FrameEvent] will be generated immediately.
 // If the window is inactive, the event is sent when the window becomes active.
 //
 // Note that Invalidate is intended for externally triggered updates, such as a
-// response from a network request. InvalidateOp is more efficient for animation
-// and similar internal updates.
+// response from a network request. The [op.InvalidateCmd] command is more efficient
+// for animation.
 //
 // Invalidate is safe for concurrent use.
 func (w *Window) Invalidate() {
-	//log.Println("(w *Window) Invalidate().............................")
 	select {
 	case w.immediateRedraws <- struct{}{}:
 		return
@@ -410,21 +373,14 @@ func (w *Window) Option(opts ...Option) {
 	}
 }
 
-// WriteClipboard writes a string to the clipboard.
-func (w *Window) WriteClipboard(s string) {
-	w.driverDefer(func(d driver) {
-		d.WriteClipboard(s)
-	})
-}
-
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close. Run is guaranteed not to deadlock if it is
-// invoked during the handling of a ViewEvent, system.FrameEvent,
-// system.StageEvent; call Run in a separate goroutine to avoid deadlock in all
+// invoked during the handling of a [ViewEvent], [FrameEvent],
+// [StageEvent]; call Run in a separate goroutine to avoid deadlock in all
 // other cases.
 //
 // Note that most programs should not call Run; configuring a Window with
-// CustomRenderer is a notable exception.
+// [CustomRenderer] is a notable exception.
 func (w *Window) Run(f func()) {
 	done := make(chan struct{})
 	w.driverDefer(func(d driver) {
@@ -449,7 +405,7 @@ func (w *Window) driverDefer(f func(d driver)) {
 
 func (w *Window) updateAnimation(d driver) {
 	animate := false
-	if w.stage >= system.StageInactive && w.hasNextFrame {
+	if w.stage >= StageInactive && w.hasNextFrame {
 		if dt := time.Until(w.nextFrame); dt <= 0 {
 			animate = true
 		} else {
@@ -539,19 +495,19 @@ func (c *callbacks) Event(e event.Event) bool {
 }
 
 // SemanticRoot returns the ID of the semantic root.
-func (c *callbacks) SemanticRoot() router.SemanticID {
+func (c *callbacks) SemanticRoot() input.SemanticID {
 	c.w.updateSemantics()
 	return c.w.semantic.root
 }
 
 // LookupSemantic looks up a semantic node from an ID. The zero ID denotes the root.
-func (c *callbacks) LookupSemantic(semID router.SemanticID) (router.SemanticNode, bool) {
+func (c *callbacks) LookupSemantic(semID input.SemanticID) (input.SemanticNode, bool) {
 	c.w.updateSemantics()
 	n, found := c.w.semantic.ids[semID]
 	return n, found
 }
 
-func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.SemanticID {
+func (c *callbacks) AppendSemanticDiffs(diffs []input.SemanticID) []input.SemanticID {
 	c.w.updateSemantics()
 	if tree := c.w.semantic.prevTree; len(tree) > 0 {
 		c.w.collectSemanticDiffs(&diffs, c.w.semantic.prevTree[0])
@@ -559,9 +515,9 @@ func (c *callbacks) AppendSemanticDiffs(diffs []router.SemanticID) []router.Sema
 	return diffs
 }
 
-func (c *callbacks) SemanticAt(pos f32.Point) (router.SemanticID, bool) {
+func (c *callbacks) SemanticAt(pos f32.Point) (input.SemanticID, bool) {
 	c.w.updateSemantics()
-	return c.w.queue.q.SemanticAt(pos)
+	return c.w.queue.SemanticAt(pos)
 }
 
 func (c *callbacks) EditorState() editorState {
@@ -603,37 +559,38 @@ func (c *callbacks) SetEditorSnippet(r key.Range) {
 	c.Event(key.SnippetEvent(r))
 }
 
-func (w *Window) moveFocus(dir router.FocusDirection, d driver) {
-	if w.queue.q.MoveFocus(dir) {
-		w.queue.q.RevealFocus(w.viewport)
+func (w *Window) moveFocus(dir key.FocusDirection) {
+	w.queue.MoveFocus(dir)
+	if _, handled := w.queue.WakeupTime(); handled {
+		w.queue.RevealFocus(w.viewport)
 	} else {
 		var v image.Point
 		switch dir {
-		case router.FocusRight:
+		case key.FocusRight:
 			v = image.Pt(+1, 0)
-		case router.FocusLeft:
+		case key.FocusLeft:
 			v = image.Pt(-1, 0)
-		case router.FocusDown:
+		case key.FocusDown:
 			v = image.Pt(0, +1)
-		case router.FocusUp:
+		case key.FocusUp:
 			v = image.Pt(0, -1)
 		default:
 			return
 		}
 		const scrollABit = unit.Dp(50)
 		dist := v.Mul(int(w.metric.Dp(scrollABit)))
-		w.queue.q.ScrollFocus(dist)
+		w.queue.ScrollFocus(dist)
 	}
 }
 
 func (c *callbacks) ClickFocus() {
-	c.w.queue.q.ClickFocus()
+	c.w.queue.ClickFocus()
 	c.w.setNextFrame(time.Time{})
 	c.w.updateAnimation(c.d)
 }
 
 func (c *callbacks) ActionAt(p f32.Point) (system.Action, bool) {
-	return c.w.queue.q.ActionAt(p)
+	return c.w.queue.ActionAt(p)
 }
 
 func (e *editorState) Replace(r key.Range, text string) {
@@ -768,7 +725,7 @@ func (w *Window) destroyGPU() {
 	}
 }
 
-// waitFrame waits for the client to either call FrameEvent.Frame
+// waitFrame waits for the client to either call [FrameEvent.Frame]
 // or to continue event handling.
 func (w *Window) waitFrame(d driver) *op.Ops {
 	for {
@@ -797,7 +754,7 @@ func (w *Window) updateSemantics() {
 	}
 	w.semantic.uptodate = true
 	w.semantic.prevTree, w.semantic.tree = w.semantic.tree, w.semantic.prevTree
-	w.semantic.tree = w.queue.q.AppendSemantics(w.semantic.tree[:0])
+	w.semantic.tree = w.queue.AppendSemantics(w.semantic.tree[:0])
 	w.semantic.root = w.semantic.tree[0].ID
 	for _, n := range w.semantic.tree {
 		w.semantic.ids[n.ID] = n
@@ -805,7 +762,7 @@ func (w *Window) updateSemantics() {
 }
 
 // collectSemanticDiffs traverses the previous semantic tree, noting changed nodes.
-func (w *Window) collectSemanticDiffs(diffs *[]router.SemanticID, n router.SemanticNode) {
+func (w *Window) collectSemanticDiffs(diffs *[]input.SemanticID, n input.SemanticNode) {
 	newNode, exists := w.semantic.ids[n.ID]
 	// Ignore deleted nodes, as their disappearance will be reported through an
 	// ancestor node.
@@ -846,8 +803,8 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 	default:
 	}
 	switch e2 := e.(type) {
-	case system.StageEvent:
-		if e2.Stage < system.StageInactive {
+	case StageEvent:
+		if e2.Stage < StageInactive {
 			if w.gpu != nil {
 				w.ctx.Lock()
 				w.gpu.Release()
@@ -863,18 +820,14 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		if e2.Size == (image.Point{}) {
 			panic(errors.New("internal error: zero-sized Draw"))
 		}
-		if w.stage < system.StageInactive {
+		if w.stage < StageInactive {
 			// No drawing if not visible.
 			break
 		}
 		w.metric = e2.Metric
-		var frameStart time.Time
-		if w.queue.q.Profiling() {
-			frameStart = time.Now()
-		}
 		w.hasNextFrame = false
 		e2.Frame = w.update
-		e2.Queue = &w.queue
+		e2.Source = w.queue.Source()
 
 		// Prepare the decorations and update the frame insets.
 		wrapper := &w.decorations.Ops
@@ -891,7 +844,7 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		}
 		// Scroll to focus if viewport is shrinking in any dimension.
 		if old, new := w.viewport.Size(), viewport.Size(); new.X < old.X || new.Y < old.Y {
-			w.queue.q.RevealFocus(viewport)
+			w.queue.RevealFocus(viewport)
 		}
 		w.viewport = viewport
 		viewSize := e2.Size
@@ -911,13 +864,13 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		deco.Add(wrapper)
 		if err := w.validateAndProcess(d, viewSize, e2.Sync, wrapper, signal); err != nil {
 			w.destroyGPU()
-			w.out <- system.DestroyEvent{Err: err}
+			w.out <- DestroyEvent{Err: err}
 			close(w.destroy)
 			break
 		}
-		w.processFrame(d, frameStart)
+		w.processFrame(d)
 		w.updateCursor(d)
-	case system.DestroyEvent:
+	case DestroyEvent:
 		w.destroyGPU()
 		w.out <- e2
 		close(w.destroy)
@@ -930,37 +883,37 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 		w.out <- e2
 	case wakeupEvent:
 	case event.Event:
-		handled := w.queue.q.Queue(e2)
-		if e, ok := e.(key.Event); ok && !handled {
-			if e.State == key.Press {
-				handled = true
-				isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
-				switch {
-				case e.Name == key.NameTab && e.Modifiers == 0:
-					w.moveFocus(router.FocusForward, d)
-				case e.Name == key.NameTab && e.Modifiers == key.ModShift:
-					w.moveFocus(router.FocusBackward, d)
-				case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusUp, d)
-				case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusDown, d)
-				case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusLeft, d)
-				case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
-					w.moveFocus(router.FocusRight, d)
-				default:
-					handled = false
-				}
+		focusDir := key.FocusDirection(-1)
+		if e, ok := e2.(key.Event); ok && e.State == key.Press {
+			isMobile := runtime.GOOS == "ios" || runtime.GOOS == "android"
+			switch {
+			case e.Name == key.NameTab && e.Modifiers == 0:
+				focusDir = key.FocusForward
+			case e.Name == key.NameTab && e.Modifiers == key.ModShift:
+				focusDir = key.FocusBackward
+			case e.Name == key.NameUpArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusUp
+			case e.Name == key.NameDownArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusDown
+			case e.Name == key.NameLeftArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusLeft
+			case e.Name == key.NameRightArrow && e.Modifiers == 0 && isMobile:
+				focusDir = key.FocusRight
 			}
-			// As a special case, the top-most input handler receives all unhandled
-			// events.
-			if !handled {
-				handled = w.queue.q.QueueTopmost(e)
-			}
+		}
+		e := e2
+		if focusDir != -1 {
+			e = input.SystemEvent{Event: e}
+		}
+		w.queue.Queue(e)
+		t, handled := w.queue.WakeupTime()
+		if focusDir != -1 && !handled {
+			w.moveFocus(focusDir)
+			t, handled = w.queue.WakeupTime()
 		}
 		w.updateCursor(d)
 		if handled {
-			w.setNextFrame(time.Time{})
+			w.setNextFrame(t)
 			w.updateAnimation(d)
 		}
 		return handled
@@ -969,16 +922,16 @@ func (w *Window) processEvent(d driver, e event.Event) bool {
 }
 
 // NextEvent blocks until an event is received from the window, such as
-// [io/system.FrameEvent]. It blocks forever if called after [io/system.DestroyEvent]
+// [FrameEvent]. It blocks forever if called after [DestroyEvent]
 // has been returned.
 func (w *Window) NextEvent() event.Event {
 	state := &w.eventState
 	if !state.created {
 		state.created = true
-			if err := newWindow(&w.callbacks, state.initialOpts); err != nil {
-				close(w.destroy)
-				return system.DestroyEvent{Err: err}
-			}	
+		if err := newWindow(&w.callbacks, state.initialOpts); err != nil {
+			close(w.destroy)
+			return DestroyEvent{Err: err}
+		}
 	}
 	for {
 		var (
@@ -1018,7 +971,7 @@ func (w *Window) NextEvent() event.Event {
 }
 
 func (w *Window) updateCursor(d driver) {
-	if c := w.queue.q.Cursor(); c != w.cursor {
+	if c := w.queue.Cursor(); c != w.cursor {
 		w.cursor = c
 		d.SetCursor(c)
 	}
@@ -1030,7 +983,7 @@ func (w *Window) fallbackDecorate() bool {
 }
 
 // decorate the window if enabled and returns the corresponding Insets.
-func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offset image.Point) {
+func (w *Window) decorate(d driver, e FrameEvent, o *op.Ops) (size, offset image.Point) {
 	if !w.fallbackDecorate() {
 		return e.Size, image.Pt(0, 0)
 	}
@@ -1056,7 +1009,7 @@ func (w *Window) decorate(d driver, e system.FrameEvent, o *op.Ops) (size, offse
 	gtx := layout.Context{
 		Ops:         o,
 		Now:         e.Now,
-		Queue:       e.Queue,
+		Source:      e.Source,
 		Metric:      e.Metric,
 		Constraints: layout.Exact(e.Size),
 	}
@@ -1107,10 +1060,6 @@ func (w *Window) Perform(actions system.Action) {
 			return
 		}
 	}
-}
-
-func (q *queue) Events(k event.Tag) []event.Event {
-	return q.q.Events(k)
 }
 
 // Title sets the title of the window.

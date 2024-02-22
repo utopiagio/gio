@@ -9,25 +9,15 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/utopiagio/gio/font/gofont"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/font/gofont"
-	//"gioui.org/io/key"
-	//"gioui.org/io/router"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
-
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/font/gofont"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 func FuzzIME(f *testing.F) {
@@ -41,10 +31,10 @@ func FuzzIME(f *testing.F) {
 	f.Fuzz(func(t *testing.T, cmds []byte) {
 		cache := text.NewShaper(text.WithCollection(gofont.Collection()))
 		e := new(widget.Editor)
-		e.Focus()
 
-		var r router.Router
-		gtx := layout.Context{Ops: new(op.Ops), Queue: &r}
+		var r input.Router
+		gtx := layout.Context{Ops: new(op.Ops), Source: r.Source()}
+		gtx.Execute(key.FocusCmd{Tag: e})
 		// Layout once to register focus.
 		e.Layout(gtx, cache, font.Font{}, unit.Sp(10), op.CallOp{}, op.CallOp{})
 		r.Frame(gtx.Ops)

@@ -5,23 +5,14 @@ package material
 import (
 	"image/color"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	//"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/internal/f32color"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 type EditorStyle struct {
@@ -70,7 +61,7 @@ func (e EditorStyle) Layout(gtx layout.Context) layout.Dimensions {
 	paint.ColorOp{Color: e.HintColor}.Add(gtx.Ops)
 	hintColor := hintColorMacro.Stop()
 	selectionColorMacro := op.Record(gtx.Ops)
-	paint.ColorOp{Color: blendDisabledColor(gtx.Queue == nil, e.SelectionColor)}.Add(gtx.Ops)
+	paint.ColorOp{Color: blendDisabledColor(!gtx.Enabled(), e.SelectionColor)}.Add(gtx.Ops)
 	selectionColor := selectionColorMacro.Stop()
 
 	var maxlines int

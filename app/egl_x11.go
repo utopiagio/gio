@@ -10,7 +10,7 @@ package app
 import (
 	"unsafe"
 
-	"github.com/utopiagio/gio/internal/egl"
+	"github.com/utopiagio/gioui/gio/internal/egl"
 )
 
 type x11Context struct {

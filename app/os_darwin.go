@@ -48,7 +48,7 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
-	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/pointer"
 )
 
 // displayLink is the state for a display link (CVDisplayLinkRef on macOS,

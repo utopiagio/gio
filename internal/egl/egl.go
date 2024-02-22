@@ -11,7 +11,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gioui/gio/gpu"
 )
 
 type Context struct {

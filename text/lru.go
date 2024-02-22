@@ -6,16 +6,11 @@ import (
 	"image"
 	"sync/atomic"
 
-
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/op/clip"
-
-	giofont "github.com/utopiagio/gio/font"
-	//"gioui.org/io/system"
-	"github.com/utopiagio/gio/op"
-	//"gioui.org/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-
+	giofont "github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
 	"golang.org/x/image/math/fixed"
 )
 
@@ -166,10 +161,6 @@ type layoutKey struct {
 	wrapPolicy         WrapPolicy
 	lineHeight         fixed.Int26_6
 	lineHeightScale    float32
-}
-
-type pathKey struct {
-	gidHash uint64
 }
 
 const maxSize = 1000

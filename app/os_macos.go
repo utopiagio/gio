@@ -8,19 +8,21 @@ package app
 import (
 	"errors"
 	"image"
+	"io"
 	"runtime"
+	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/utopiagio/gio/internal/f32"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/internal/f32"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/unit"
 
-	_ "github.com/utopiagio/gio/internal/cocoainit"
+	_ "github.com/utopiagio/gioui/gio/internal/cocoainit"
 )
 
 /*
@@ -54,16 +56,6 @@ static CFTypeRef readClipboard(void) {
 		return (__bridge_retained CFTypeRef)content;
 	}
 }
-
-//static CGFloat viewX(CFTypeRef viewRef) {
-	//NSView *view = (__bridge NSView *)viewRef;
-	//return NSMinX([view frame]);
-//}
-
-//static CGFloat viewY(CFTypeRef viewRef) {
-	//NSView *view = (__bridge NSView *)viewRef;
-	//return NSMinX([view frame]);
-//}
 
 static CGFloat viewHeight(CFTypeRef viewRef) {
 	NSView *view = (__bridge NSView *)viewRef;
@@ -138,6 +130,7 @@ static void closeWindow(CFTypeRef windowRef) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	[window performClose:nil];
 }
+
 // *************************************************************************
 // RNW Added window setPos to set window position
 static void setPos(CFTypeRef windowRef, CGFloat x, CGFloat y) {
@@ -146,6 +139,7 @@ static void setPos(CFTypeRef windowRef, CGFloat x, CGFloat y) {
 	[window setFrameTopLeftPoint(pos);
 }
 // *************************************************************************
+
 static void setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	NSSize size = NSMakeSize(width, height);
@@ -264,7 +258,7 @@ type ViewEvent struct {
 type window struct {
 	view        C.CFTypeRef
 	w           *callbacks
-	stage       system.Stage
+	stage       Stage
 	displayLink *displayLink
 	// redraw is a single entry channel for making sure only one
 	// display link redraw request is in flight.
@@ -322,11 +316,16 @@ func (w *window) ReadClipboard() {
 		defer C.CFRelease(cstr)
 	}
 	content := nsstringToString(cstr)
-	w.w.Event(clipboard.Event{Text: content})
+	w.w.Event(transfer.DataEvent{
+		Type: "application/text",
+		Open: func() io.ReadCloser {
+			return io.NopCloser(strings.NewReader(content))
+		},
+	})
 }
 
-func (w *window) WriteClipboard(s string) {
-	cstr := stringToNSString(s)
+func (w *window) WriteClipboard(mime string, s []byte) {
+	cstr := stringToNSString(string(s))
 	defer C.CFRelease(cstr)
 	C.writeClipboard(cstr)
 }
@@ -395,8 +394,7 @@ func (w *window) Configure(options []Option) {
 		w.config.Mode = Windowed
 		w.setTitle(prev, cnf)
 		// *************************************************************************
-		// **************************************************************************
-		// ************ RNW Added config pos change  28.01.2024 ***************
+		// RNW Added window position to update config.Pos
 		if prev.Pos != cnf.Pos {
 			w.config.Pos = cnf.Pos
 			cnf.Pos = cnf.Pos.Div(int(screenScale))
@@ -507,12 +505,12 @@ func (w *window) runOnMain(f func()) {
 	})
 }
 
-func (w *window) setStage(stage system.Stage) {
+func (w *window) setStage(stage Stage) {
 	if stage == w.stage {
 		return
 	}
 	w.stage = stage
-	w.w.Event(system.StageEvent{Stage: stage})
+	w.w.Event(StageEvent{Stage: stage})
 }
 
 //export gio_onKeys
@@ -602,11 +600,11 @@ func gio_onDraw(view C.CFTypeRef) {
 func gio_onFocus(view C.CFTypeRef, focus C.int) {
 	w := mustView(view)
 	w.w.Event(key.FocusEvent{Focus: focus == 1})
-	if w.stage >= system.StageInactive {
+	if w.stage >= StageInactive {
 		if focus == 0 {
-			w.setStage(system.StageInactive)
+			w.setStage(StageInactive)
 		} else {
-			w.setStage(system.StageRunning)
+			w.setStage(StageRunning)
 		}
 	}
 	w.SetCursor(w.cursor)
@@ -797,14 +795,13 @@ func (w *window) draw() {
 		w.config.Size = sz
 		w.w.Event(ConfigEvent{Config: w.config})
 	}
-
 	if sz.X == 0 || sz.Y == 0 {
 		return
 	}
 	cfg := configFor(w.scale)
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   w.config.Size,
 			Metric: cfg,
@@ -824,7 +821,7 @@ func configFor(scale float32) unit.Metric {
 func gio_onClose(view C.CFTypeRef) {
 	w := mustView(view)
 	w.w.Event(ViewEvent{})
-	w.w.Event(system.DestroyEvent{})
+	w.w.Event(DestroyEvent{})
 	w.displayLink.Close()
 	w.displayLink = nil
 	deleteView(view)
@@ -835,13 +832,13 @@ func gio_onClose(view C.CFTypeRef) {
 //export gio_onHide
 func gio_onHide(view C.CFTypeRef) {
 	w := mustView(view)
-	w.setStage(system.StagePaused)
+	w.setStage(StagePaused)
 }
 
 //export gio_onShow
 func gio_onShow(view C.CFTypeRef) {
 	w := mustView(view)
-	w.setStage(system.StageRunning)
+	w.setStage(StageRunning)
 }
 
 //export gio_onFullscreen
@@ -861,14 +858,14 @@ func gio_onWindowed(view C.CFTypeRef) {
 //export gio_onAppHide
 func gio_onAppHide() {
 	for _, w := range viewMap {
-		w.setStage(system.StagePaused)
+		w.setStage(StagePaused)
 	}
 }
 
 //export gio_onAppShow
 func gio_onAppShow() {
 	for _, w := range viewMap {
-		w.setStage(system.StageRunning)
+		w.setStage(StageRunning)
 	}
 }
 
@@ -940,8 +937,8 @@ func osMain() {
 	C.gio_main()
 }
 
-func convertKey(k rune) (string, bool) {
-	var n string
+func convertKey(k rune) (key.Name, bool) {
+	var n key.Name
 	switch k {
 	case 0x1b:
 		n = key.NameEscape
@@ -1002,7 +999,7 @@ func convertKey(k rune) (string, bool) {
 		if !unicode.IsPrint(k) {
 			return "", false
 		}
-		n = string(k)
+		n = key.Name(k)
 	}
 	return n, true
 }

@@ -21,19 +21,14 @@ import (
 	"golang.org/x/image/math/fixed"
 	"golang.org/x/text/unicode/bidi"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-
-	//"gioui.org/f32"
-	giofont "github.com/utopiagio/gio/font"
-	"github.com/utopiagio/gio/font/opentype"
-	"github.com/utopiagio/gio/internal/debug"
-	//"github.com/utopiagio/gio/io/system"
-	//"github.com/utopiagio/gio/op"
-	//"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/f32"
+	giofont "github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/font/opentype"
+	"github.com/utopiagio/gioui/gio/internal/debug"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
 )
 
 // document holds a collection of shaped lines and alignment information for
@@ -278,6 +273,10 @@ func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
 	return &shaper
 }
 
+// RNW Modified to fix parameters passed to shaperImpl.addFace()
+// location  fontscan.Location
+// md        opentype.FontToDescription
+// **********************************************
 // Load registers the provided FontFace with the shaper, if it is compatible.
 // It returns whether the face is now available for use. FontFaces are prioritized
 // in the order in which they are loaded, with the first face being the default.
@@ -285,6 +284,7 @@ func (s *shaperImpl) Load(f FontFace) {
 	md := opentype.FontToDescription(f.Font)
 	location := fontscan.Location{File: fmt.Sprint(md)}
 	s.fontMap.AddFace(f.Face.Face(), location, md)
+	//s.fontMap.AddFace(f.Face.Face(), opentype.FontToDescription(f.Font))
 	s.addFace(f.Face.Face(), f.Font)
 }
 

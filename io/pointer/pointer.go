@@ -3,17 +3,15 @@
 package pointer
 
 import (
-	"encoding/binary"
-	"fmt"
 	"image"
 	"strings"
 	"time"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/io/event"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 // Event is a pointer event.
@@ -56,14 +54,12 @@ type PassStack struct {
 	macroID uint32
 }
 
-// InputOp declares an input handler ready for pointer
-// events.
-type InputOp struct {
-	Tag event.Tag
-	// Grab, if set, request that the handler get
-	// Grabbed priority.
-	Grab bool
-	// Kinds is a bitwise-or of event types to receive.
+// Filter matches every [Event] that target the Tag and whose kind is
+// included in Kinds. Note that only tags specified in [event.Op] can
+// be targeted by pointer events.
+type Filter struct {
+	Target event.Tag
+	// Kinds is a bitwise-or of event types to match.
 	Kinds Kind
 	// ScrollBounds describe the maximum scrollable distances in both
 	// axes. Specifically, any Event e delivered to Tag will satisfy
@@ -71,6 +67,12 @@ type InputOp struct {
 	// ScrollBounds.Min.X <= e.Scroll.X <= ScrollBounds.Max.X (horizontal axis)
 	// ScrollBounds.Min.Y <= e.Scroll.Y <= ScrollBounds.Max.Y (vertical axis)
 	ScrollBounds image.Rectangle
+}
+
+// GrabCmd requests a pointer grab on the pointer identified by ID.
+type GrabCmd struct {
+	Tag event.Tag
+	ID  ID
 }
 
 type ID uint16
@@ -171,7 +173,7 @@ const (
 const (
 	// A Cancel event is generated when the current gesture is
 	// interrupted by other handlers or the system.
-	Cancel Kind = (1 << iota) >> 1
+	Cancel Kind = 1 << iota
 	// Press of a pointer.
 	Press
 	// Release of a pointer.
@@ -235,30 +237,6 @@ func (op Cursor) Add(o *op.Ops) {
 	data := ops.Write(&o.Internal, ops.TypeCursorLen)
 	data[0] = byte(ops.TypeCursor)
 	data[1] = byte(op)
-}
-
-// Add panics if the scroll range does not contain zero.
-func (op InputOp) Add(o *op.Ops) {
-	if op.Tag == nil {
-		panic("Tag must be non-nil")
-	}
-	if b := op.ScrollBounds; b.Min.X > 0 || b.Max.X < 0 || b.Min.Y > 0 || b.Max.Y < 0 {
-		panic(fmt.Errorf("invalid scroll range value %v", b))
-	}
-	if op.Kinds>>16 > 0 {
-		panic(fmt.Errorf("value in Types overflows uint16"))
-	}
-	data := ops.Write1(&o.Internal, ops.TypePointerInputLen, op.Tag)
-	data[0] = byte(ops.TypePointerInput)
-	if op.Grab {
-		data[1] = 1
-	}
-	bo := binary.LittleEndian
-	bo.PutUint16(data[2:], uint16(op.Kinds))
-	bo.PutUint32(data[4:], uint32(op.ScrollBounds.Min.X))
-	bo.PutUint32(data[8:], uint32(op.ScrollBounds.Min.Y))
-	bo.PutUint32(data[12:], uint32(op.ScrollBounds.Max.X))
-	bo.PutUint32(data[16:], uint32(op.ScrollBounds.Max.Y))
 }
 
 func (t Kind) String() string {
@@ -404,3 +382,7 @@ func (c Cursor) String() string {
 }
 
 func (Event) ImplementsEvent() {}
+
+func (GrabCmd) ImplementsCommand() {}
+
+func (Filter) ImplementsFilter() {}

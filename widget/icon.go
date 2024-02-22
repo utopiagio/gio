@@ -7,11 +7,11 @@ import (
 	"image/color"
 	"image/draw"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/unit"
 
 	"golang.org/x/exp/shiny/iconvg"
 )

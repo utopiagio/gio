@@ -5,11 +5,11 @@ package widget
 import (
 	"image"
 
-	"github.com/utopiagio/gio/gesture"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/gesture"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 // Scrollbar holds the persistent state for an area that can
@@ -61,7 +61,11 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 	}
 
 	// Jump to a click in the track.
-	for _, event := range s.track.Update(gtx) {
+	for {
+		event, ok := s.track.Update(gtx.Source)
+		if !ok {
+			break
+		}
 		if event.Kind != gesture.KindClick ||
 			event.Modifiers != key.Modifiers(0) ||
 			event.NumClicks > 1 {
@@ -80,7 +84,11 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 	}
 
 	// Offset to account for any drags.
-	for _, event := range s.drag.Update(gtx.Metric, gtx, gesture.Axis(axis)) {
+	for {
+		event, ok := s.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(axis))
+		if !ok {
+			break
+		}
 		switch event.Kind {
 		case pointer.Drag:
 		case pointer.Release, pointer.Cancel:
@@ -136,7 +144,11 @@ func (s *Scrollbar) Update(gtx layout.Context, axis layout.Axis, viewportStart, 
 
 	// Process events from the indicator so that hover is
 	// detected properly.
-	_ = s.indicator.Update(gtx)
+	for {
+		if _, ok := s.indicator.Update(gtx.Source); !ok {
+			break
+		}
+	}
 }
 
 // AddTrack configures the track click listener for the scrollbar to use

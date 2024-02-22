@@ -10,7 +10,7 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"github.com/utopiagio/gio/internal/gl"
+	"github.com/utopiagio/gioui/gio/internal/gl"
 )
 
 type (

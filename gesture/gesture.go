@@ -15,13 +15,14 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/internal/fling"
-	"github.com/utopiagio/gio/io/event"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/internal/fling"
+	"github.com/utopiagio/gioui/gio/io/event"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 // The duration is somewhat arbitrary.
@@ -37,15 +38,19 @@ type Hover struct {
 
 // Add the gesture to detect hovering over the current pointer area.
 func (h *Hover) Add(ops *op.Ops) {
-	pointer.InputOp{
-		Tag:   h,
-		Kinds: pointer.Enter | pointer.Leave,
-	}.Add(ops)
+	event.Op(ops, h)
 }
 
 // Update state and report whether a pointer is inside the area.
-func (h *Hover) Update(q event.Queue) bool {
-	for _, ev := range q.Events(h) {
+func (h *Hover) Update(q input.Source) bool {
+	for {
+		ev, ok := q.Event(pointer.Filter{
+			Target: h,
+			Kinds:  pointer.Enter | pointer.Leave | pointer.Cancel,
+		})
+		if !ok {
+			break
+		}
 		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
@@ -107,7 +112,6 @@ type Drag struct {
 	pressed  bool
 	pid      pointer.ID
 	start    f32.Point
-	grab     bool
 }
 
 // Scroll detects scroll gestures and reduces them to
@@ -115,11 +119,9 @@ type Drag struct {
 // movements as well as drag and fling touch gestures.
 type Scroll struct {
 	dragging  bool
-	axis      Axis
 	estimator fling.Extrapolation
 	flinger   fling.Animation
 	pid       pointer.ID
-	grab      bool
 	last      int
 	// Leftover scroll.
 	scroll float32
@@ -161,10 +163,7 @@ const touchSlop = unit.Dp(3)
 
 // Add the handler to the operation list to receive click events.
 func (c *Click) Add(ops *op.Ops) {
-	pointer.InputOp{
-		Tag:   c,
-		Kinds: pointer.Press | pointer.Release | pointer.Enter | pointer.Leave,
-	}.Add(ops)
+	event.Op(ops, c)
 }
 
 // Hovered returns whether a pointer is inside the area.
@@ -177,10 +176,16 @@ func (c *Click) Pressed() bool {
 	return c.pressed
 }
 
-// Update state and return the click events.
-func (c *Click) Update(q event.Queue) []ClickEvent {
-	var events []ClickEvent
-	for _, evt := range q.Events(c) {
+// Update state and return the next click events, if any.
+func (c *Click) Update(q input.Source) (ClickEvent, bool) {
+	for {
+		evt, ok := q.Event(pointer.Filter{
+			Target: c,
+			Kinds:  pointer.Press | pointer.Release | pointer.Enter | pointer.Leave | pointer.Cancel,
+		})
+		if !ok {
+			break
+		}
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -192,9 +197,15 @@ func (c *Click) Update(q event.Queue) []ClickEvent {
 			}
 			c.pressed = false
 			if !c.entered || c.hovered {
-				events = append(events, ClickEvent{Kind: KindClick, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+				return ClickEvent{
+					Kind:      KindClick,
+					Position:  e.Position.Round(),
+					Source:    e.Source,
+					Modifiers: e.Modifiers,
+					NumClicks: c.clicks,
+				}, true
 			} else {
-				events = append(events, ClickEvent{Kind: KindCancel})
+				return ClickEvent{Kind: KindCancel}, true
 			}
 		case pointer.Cancel:
 			wasPressed := c.pressed
@@ -202,7 +213,7 @@ func (c *Click) Update(q event.Queue) []ClickEvent {
 			c.hovered = false
 			c.entered = false
 			if wasPressed {
-				events = append(events, ClickEvent{Kind: KindCancel})
+				return ClickEvent{Kind: KindCancel}, true
 			}
 		case pointer.Press:
 			if c.pressed {
@@ -224,7 +235,7 @@ func (c *Click) Update(q event.Queue) []ClickEvent {
 				c.clicks = 1
 			}
 			c.clickedAt = e.Time
-			events = append(events, ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks})
+			return ClickEvent{Kind: KindPress, Position: e.Position.Round(), Source: e.Source, Modifiers: e.Modifiers, NumClicks: c.clicks}, true
 		case pointer.Leave:
 			if !c.pressed {
 				c.pid = e.PointerID
@@ -242,25 +253,16 @@ func (c *Click) Update(q event.Queue) []ClickEvent {
 			}
 		}
 	}
-	return events
+	return ClickEvent{}, false
 }
 
 func (ClickEvent) ImplementsEvent() {}
 
 // Add the handler to the operation list to receive scroll events.
 // The bounds variable refers to the scrolling boundaries
-// as defined in io/pointer.InputOp.
-func (s *Scroll) Add(ops *op.Ops, bounds image.Rectangle) {
-	oph := pointer.InputOp{
-		Tag:          s,
-		Grab:         s.grab,
-		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll,
-		ScrollBounds: bounds,
-	}
-	oph.Add(ops)
-	if s.flinger.Active() {
-		op.InvalidateOp{}.Add(ops)
-	}
+// as defined in [pointer.Filter].
+func (s *Scroll) Add(ops *op.Ops) {
+	event.Op(ops, s)
 }
 
 // Stop any remaining fling movement.
@@ -269,13 +271,18 @@ func (s *Scroll) Stop() {
 }
 
 // Update state and report the scroll distance along axis.
-func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) int {
-	if s.axis != axis {
-		s.axis = axis
-		return 0
-	}
+func (s *Scroll) Update(cfg unit.Metric, q input.Source, t time.Time, axis Axis, bounds image.Rectangle) int {
 	total := 0
-	for _, evt := range q.Events(s) {
+	f := pointer.Filter{
+		Target:       s,
+		Kinds:        pointer.Press | pointer.Drag | pointer.Release | pointer.Scroll | pointer.Cancel,
+		ScrollBounds: bounds,
+	}
+	for {
+		evt, ok := q.Event(f)
+		if !ok {
+			break
+		}
 		e, ok := evt.(pointer.Event)
 		if !ok {
 			continue
@@ -292,7 +299,7 @@ func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 			}
 			s.Stop()
 			s.estimator = fling.Extrapolation{}
-			v := s.val(e.Position)
+			v := s.val(axis, e.Position)
 			s.last = int(math.Round(float64(v)))
 			s.estimator.Sample(e.Time, v)
 			s.dragging = true
@@ -308,9 +315,8 @@ func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 			fallthrough
 		case pointer.Cancel:
 			s.dragging = false
-			s.grab = false
 		case pointer.Scroll:
-			switch s.axis {
+			switch axis {
 			case Horizontal:
 				s.scroll += e.Scroll.X
 			case Vertical:
@@ -323,14 +329,14 @@ func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 			if !s.dragging || s.pid != e.PointerID {
 				continue
 			}
-			val := s.val(e.Position)
+			val := s.val(axis, e.Position)
 			s.estimator.Sample(e.Time, val)
 			v := int(math.Round(float64(val)))
 			dist := s.last - v
 			if e.Priority < pointer.Grabbed {
 				slop := cfg.Dp(touchSlop)
 				if dist := dist; dist >= slop || -slop >= dist {
-					s.grab = true
+					q.Execute(pointer.GrabCmd{Tag: s, ID: e.PointerID})
 				}
 			} else {
 				s.last = v
@@ -339,11 +345,14 @@ func (s *Scroll) Update(cfg unit.Metric, q event.Queue, t time.Time, axis Axis) 
 		}
 	}
 	total += s.flinger.Tick(t)
+	if s.flinger.Active() {
+		q.Execute(op.InvalidateCmd{})
+	}
 	return total
 }
 
-func (s *Scroll) val(p f32.Point) float32 {
-	if s.axis == Horizontal {
+func (s *Scroll) val(axis Axis, p f32.Point) float32 {
+	if axis == Horizontal {
 		return p.X
 	} else {
 		return p.Y
@@ -364,18 +373,20 @@ func (s *Scroll) State() ScrollState {
 
 // Add the handler to the operation list to receive drag events.
 func (d *Drag) Add(ops *op.Ops) {
-	pointer.InputOp{
-		Tag:   d,
-		Grab:  d.grab,
-		Kinds: pointer.Press | pointer.Drag | pointer.Release,
-	}.Add(ops)
+	event.Op(ops, d)
 }
 
-// Update state and return the drag events.
-func (d *Drag) Update(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event {
-	var events []pointer.Event
-	for _, e := range q.Events(d) {
-		e, ok := e.(pointer.Event)
+// Update state and return the next drag event, if any.
+func (d *Drag) Update(cfg unit.Metric, q input.Source, axis Axis) (pointer.Event, bool) {
+	for {
+		ev, ok := q.Event(pointer.Filter{
+			Target: d,
+			Kinds:  pointer.Press | pointer.Drag | pointer.Release | pointer.Cancel,
+		})
+		if !ok {
+			break
+		}
+		e, ok := ev.(pointer.Event)
 		if !ok {
 			continue
 		}
@@ -408,7 +419,7 @@ func (d *Drag) Update(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 				diff := e.Position.Sub(d.start)
 				slop := cfg.Dp(touchSlop)
 				if diff.X*diff.X+diff.Y*diff.Y > float32(slop*slop) {
-					d.grab = true
+					q.Execute(pointer.GrabCmd{Tag: d, ID: e.PointerID})
 				}
 			}
 		case pointer.Release, pointer.Cancel:
@@ -417,13 +428,12 @@ func (d *Drag) Update(cfg unit.Metric, q event.Queue, axis Axis) []pointer.Event
 				continue
 			}
 			d.dragging = false
-			d.grab = false
 		}
 
-		events = append(events, e)
+		return e, true
 	}
 
-	return events
+	return pointer.Event{}, false
 }
 
 // Dragging reports whether it is currently in use.

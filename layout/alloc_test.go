@@ -9,7 +9,7 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 func TestStackAllocs(t *testing.T) {

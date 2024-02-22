@@ -12,8 +12,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/utopiagio/gio/gpu/internal/driver"
-	"github.com/utopiagio/gio/internal/gl"
+	"github.com/utopiagio/gioui/gio/gpu/internal/driver"
+	"github.com/utopiagio/gioui/gio/internal/gl"
 	"gioui.org/shader"
 )
 

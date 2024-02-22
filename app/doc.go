@@ -8,21 +8,19 @@ See https://gioui.org for instructions to set up and run Gio programs.
 
 # Windows
 
-Create a new Window by calling NewWindow. On mobile platforms or when Gio
+Create a new [Window] by calling [NewWindow]. On mobile platforms or when Gio
 is embedded in another project, NewWindow merely connects with a previously
 created window.
 
-A Window is run by calling NextEvent in a loop. The most important event is
-FrameEvent that prompts an update of the window contents.
+A Window is run by calling its NextEvent method in a loop. The most important event is
+[FrameEvent] that prompts an update of the window contents.
 
 For example:
-
-	import "gioui.org/unit"
 
 	w := app.NewWindow()
 	for {
 		e := w.NextEvent()
-		if e, ok := e.(system.FrameEvent); ok {
+		if e, ok := e.(app.FrameEvent); ok {
 			ops.Reset()
 			// Add operations to ops.
 			...
@@ -32,7 +30,7 @@ For example:
 	}
 
 A program must keep receiving events from the event channel until
-DestroyEvent is received.
+[DestroyEvent] is received.
 
 # Main
 
@@ -57,23 +55,11 @@ For example, to display a blank but otherwise functional window:
 		app.Main()
 	}
 
-# Event queue
-
-A FrameEvent's Queue method returns an event.Queue implementation that distributes
-incoming events to the event handlers declared in the last frame.
-See the gioui.org/io/event package for more information about event handlers.
-
 # Permissions
 
 The packages under gioui.org/app/permission should be imported
 by a Gio program or by one of its dependencies to indicate that specific
 operating-system permissions are required.  Please see documentation for
 package gioui.org/app/permission for more information.
-
-# Layout
-
-
 */
-
-
 package app

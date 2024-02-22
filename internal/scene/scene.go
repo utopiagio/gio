@@ -11,7 +11,7 @@ import (
 	"math"
 	"unsafe"
 
-	"github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gioui/gio/internal/f32"
 )
 
 type Op uint32

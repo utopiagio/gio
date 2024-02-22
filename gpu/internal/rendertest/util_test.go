@@ -17,11 +17,11 @@ import (
 
 	"golang.org/x/image/colornames"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/gpu/headless"
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/gpu/headless"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/paint"
 )
 
 var (

@@ -5,21 +5,14 @@ package material
 import (
 	"image/color"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-	"github.com/utopiagio/gio/widget"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/internal/f32color"
-	//"gioui.org/layout"
-	"github.com/utopiagio/gio/op"
-	//"gioui.org/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 // LabelStyle configures the presentation of text. If the State field is set, the
@@ -51,6 +44,7 @@ type LabelStyle struct {
 	// LineHeightScale applies a scaling factor to the LineHeight. If zero, a
 	// sensible default will be used.
 	LineHeightScale float32
+
 	// Shaper is the text shaper used to display this labe. This field is automatically
 	// set using by all constructor functions. If constructing a LabelStyle literal, you
 	// must provide a Shaper or displaying text will panic.

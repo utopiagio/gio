@@ -8,7 +8,7 @@ package app
 import (
 	"errors"
 
-	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gioui/gio/gpu"
 )
 
 /*

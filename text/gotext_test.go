@@ -14,12 +14,9 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/utopiagio/gio/font/opentype"
-	"github.com/utopiagio/gio/io/system"
-
-	giofont "github.com/utopiagio/gio/font"
-	//"github.com/utopiagio/gio/font/opentype"
-	//"github.com/utopiagio/gio/io/system"
+	giofont "github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/font/opentype"
+	"github.com/utopiagio/gioui/gio/io/system"
 )
 
 var english = system.Locale{

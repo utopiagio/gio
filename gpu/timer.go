@@ -5,7 +5,7 @@ package gpu
 import (
 	"time"
 
-	"github.com/utopiagio/gio/gpu/internal/driver"
+	"github.com/utopiagio/gioui/gio/gpu/internal/driver"
 )
 
 type timers struct {

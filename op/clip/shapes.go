@@ -6,10 +6,10 @@ import (
 	"image"
 	"math"
 
-	"github.com/utopiagio/gio/f32"
-	f32internal "github.com/utopiagio/gio/internal/f32"
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/f32"
+	f32internal "github.com/utopiagio/gioui/gio/internal/f32"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 // Rect represents the clip area of a pixel-aligned rectangle.

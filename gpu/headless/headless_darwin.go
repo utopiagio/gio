@@ -5,8 +5,8 @@ package headless
 import (
 	"errors"
 
-	"github.com/utopiagio/gio/gpu"
-	_ "github.com/utopiagio/gio/internal/cocoainit"
+	"github.com/utopiagio/gioui/gio/gpu"
+	_ "github.com/utopiagio/gioui/gio/internal/cocoainit"
 )
 
 /*

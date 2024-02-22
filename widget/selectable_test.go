@@ -5,20 +5,14 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/font/gofont"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/text"
-	"github.com/utopiagio/gio/unit"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/font/gofont"
-	//"gioui.org/io/key"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/text"
-	//"gioui.org/unit"
+	"github.com/utopiagio/gioui/gio/font"
+	"github.com/utopiagio/gioui/gio/font/gofont"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/text"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 func TestSelectableZeroValue(t *testing.T) {
@@ -40,9 +34,11 @@ func TestSelectableZeroValue(t *testing.T) {
 
 // Verify that an existing selection is dismissed when you press arrow keys.
 func TestSelectableMove(t *testing.T) {
+	r := new(input.Router)
 	gtx := layout.Context{
 		Ops:    new(op.Ops),
 		Locale: english,
+		Source: r.Source(),
 	}
 	cache := text.NewShaper(text.NoSystemFonts(), text.WithCollection(gofont.Collection()))
 	fnt := font.Font{}
@@ -51,13 +47,20 @@ func TestSelectableMove(t *testing.T) {
 	str := `0123456789`
 
 	// Layout once to populate e.lines and get focus.
-	gtx.Queue = newQueue(key.FocusEvent{Focus: true})
 	s := new(Selectable)
 
+	gtx.Execute(key.FocusCmd{Tag: s})
 	s.SetText(str)
+	// Set up selection so the Selectable filters for all 4 directional keys.
 	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	s.SetCaret(3, 6)
+	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
+	s.Layout(gtx, cache, font.Font{}, fontSize, op.CallOp{}, op.CallOp{})
+	r.Frame(gtx.Ops)
 
-	testKey := func(keyName string) {
+	for _, keyName := range []key.Name{key.NameLeftArrow, key.NameRightArrow, key.NameUpArrow, key.NameDownArrow} {
 		// Select 345
 		s.SetCaret(3, 6)
 		if start, end := s.Selection(); start != 3 || end != 6 {
@@ -68,19 +71,15 @@ func TestSelectableMove(t *testing.T) {
 		}
 
 		// Press the key
-		gtx.Queue = newQueue(key.Event{State: key.Press, Name: keyName})
+		r.Queue(key.Event{State: key.Press, Name: keyName})
 		s.SetText(str)
 		s.Layout(gtx, cache, fnt, fontSize, op.CallOp{}, op.CallOp{})
+		r.Frame(gtx.Ops)
 
 		if expected, got := "", s.SelectedText(); expected != got {
 			t.Errorf("KeyName %s, expected %q, got %q", keyName, expected, got)
 		}
 	}
-
-	testKey(key.NameLeftArrow)
-	testKey(key.NameRightArrow)
-	testKey(key.NameUpArrow)
-	testKey(key.NameDownArrow)
 }
 
 func TestSelectableConfigurations(t *testing.T) {

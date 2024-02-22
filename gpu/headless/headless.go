@@ -9,9 +9,9 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/utopiagio/gio/gpu"
-	"github.com/utopiagio/gio/gpu/internal/driver"
-	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gioui/gio/gpu"
+	"github.com/utopiagio/gioui/gio/gpu/internal/driver"
+	"github.com/utopiagio/gioui/gio/op"
 )
 
 // Window is a headless window.

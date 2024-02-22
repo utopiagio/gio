@@ -6,7 +6,7 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/internal/ops"
 )
 
 func TestTransformChecks(t *testing.T) {

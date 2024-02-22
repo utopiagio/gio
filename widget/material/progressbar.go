@@ -6,11 +6,11 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/utopiagio/gio/internal/f32color"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op/clip"
-	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/paint"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 type ProgressBarStyle struct {
@@ -51,7 +51,7 @@ func (p ProgressBarStyle) Layout(gtx layout.Context) layout.Dimensions {
 		layout.Stacked(func(gtx layout.Context) layout.Dimensions {
 			fillWidth := int(float32(progressBarWidth) * clamp1(p.Progress))
 			fillColor := p.Color
-			if gtx.Queue == nil {
+			if !gtx.Enabled() {
 				fillColor = f32color.Disabled(fillColor)
 			}
 			return shader(fillWidth, fillColor)

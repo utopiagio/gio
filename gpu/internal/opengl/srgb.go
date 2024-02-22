@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/utopiagio/gio/internal/byteslice"
-	"github.com/utopiagio/gio/internal/gl"
+	"github.com/utopiagio/gioui/gio/internal/byteslice"
+	"github.com/utopiagio/gioui/gio/internal/gl"
 )
 
 // SRGBFBO implements an intermediate sRGB FBO

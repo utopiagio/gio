@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gioui/gio/op/clip"
 )
 
 func TestLayoutLRU(t *testing.T) {

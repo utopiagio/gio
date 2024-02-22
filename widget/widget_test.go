@@ -6,23 +6,24 @@ import (
 	"image"
 	"testing"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/router"
-	"github.com/utopiagio/gio/io/semantic"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/layout"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/input"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/semantic"
+	"github.com/utopiagio/gioui/gio/layout"
+	"github.com/utopiagio/gioui/gio/op"
+	"github.com/utopiagio/gioui/gio/widget"
 )
 
 func TestBool(t *testing.T) {
 	var (
-		ops op.Ops
-		r   router.Router
-		b   widget.Bool
+		r input.Router
+		b widget.Bool
 	)
-	gtx := layout.NewContext(&ops, system.FrameEvent{Queue: &r})
+	gtx := layout.Context{
+		Ops:    new(op.Ops),
+		Source: r.Source(),
+	}
 	layout := func() {
 		b.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 			semantic.CheckBox.Add(gtx.Ops)
@@ -44,7 +45,7 @@ func TestBool(t *testing.T) {
 			Position: f32.Pt(50, 50),
 		},
 	)
-	ops.Reset()
+	gtx.Reset()
 	layout()
 	r.Frame(gtx.Ops)
 	tree := r.AppendSemantics(nil)

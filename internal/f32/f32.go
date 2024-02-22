@@ -10,7 +10,7 @@ import (
 	"image"
 	"math"
 
-	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gioui/gio/f32"
 )
 
 type Point = f32.Point

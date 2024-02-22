@@ -6,20 +6,21 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"io"
 	"strings"
 	"syscall/js"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gioui/gio/internal/f32color"
 
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/clipboard"
-	"github.com/utopiagio/gio/io/key"
-	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/f32"
+	"github.com/utopiagio/gioui/gio/io/key"
+	"github.com/utopiagio/gioui/gio/io/pointer"
+	"github.com/utopiagio/gioui/gio/io/system"
+	"github.com/utopiagio/gioui/gio/io/transfer"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 type ViewEvent struct {
@@ -101,7 +102,12 @@ func newWindow(win *callbacks, options []Option) error {
 	})
 	w.clipboardCallback = w.funcOf(func(this js.Value, args []js.Value) interface{} {
 		content := args[0].String()
-		go win.Event(clipboard.Event{Text: content})
+		go win.Event(transfer.DataEvent{
+			Type: "application/text",
+			Open: func() io.ReadCloser {
+				return io.NopCloser(strings.NewReader(content))
+			},
+		})
 		return nil
 	})
 	w.addEventListeners()
@@ -114,7 +120,7 @@ func newWindow(win *callbacks, options []Option) error {
 		w.Configure(options)
 		w.blur()
 		w.w.Event(ViewEvent{Element: cont})
-		w.w.Event(system.StageEvent{Stage: system.StageRunning})
+		w.w.Event(StageEvent{Stage: StageRunning})
 		w.resize()
 		w.draw(true)
 		for {
@@ -207,12 +213,12 @@ func (w *window) addEventListeners() {
 		return w.browserHistory.Call("back")
 	})
 	w.addEventListener(w.document, "visibilitychange", func(this js.Value, args []js.Value) interface{} {
-		ev := system.StageEvent{}
+		ev := StageEvent{}
 		switch w.document.Get("visibilityState").String() {
 		case "hidden", "prerender", "unloaded":
-			ev.Stage = system.StagePaused
+			ev.Stage = StagePaused
 		default:
-			ev.Stage = system.StageRunning
+			ev.Stage = StageRunning
 		}
 		w.w.Event(ev)
 		return nil
@@ -533,14 +539,14 @@ func (w *window) ReadClipboard() {
 	w.clipboard.Call("readText", w.clipboard).Call("then", w.clipboardCallback)
 }
 
-func (w *window) WriteClipboard(s string) {
+func (w *window) WriteClipboard(mime string, s []byte) {
 	if w.clipboard.IsUndefined() {
 		return
 	}
 	if w.clipboard.Get("writeText").IsUndefined() {
 		return
 	}
-	w.clipboard.Call("writeText", s)
+	w.clipboard.Call("writeText", string(s))
 }
 
 func (w *window) Configure(options []Option) {
@@ -666,7 +672,7 @@ func (w *window) draw(sync bool) {
 	}
 
 	w.w.Event(frameEvent{
-		FrameEvent: system.FrameEvent{
+		FrameEvent: FrameEvent{
 			Now:    time.Now(),
 			Size:   size,
 			Insets: insets,
@@ -676,10 +682,10 @@ func (w *window) draw(sync bool) {
 	})
 }
 
-func (w *window) getConfig() (image.Point, system.Insets, unit.Metric) {
+func (w *window) getConfig() (image.Point, Insets, unit.Metric) {
 	invscale := unit.Dp(1. / w.scale)
 	return image.Pt(w.config.Size.X, w.config.Size.Y),
-		system.Insets{
+		Insets{
 			Bottom: unit.Dp(w.inset.Y) * invscale,
 			Right:  unit.Dp(w.inset.X) * invscale,
 		}, unit.Metric{
@@ -746,8 +752,8 @@ func osMain() {
 	select {}
 }
 
-func translateKey(k string) (string, bool) {
-	var n string
+func translateKey(k string) (key.Name, bool) {
+	var n key.Name
 
 	switch k {
 	case "ArrowUp":
@@ -814,7 +820,7 @@ func translateKey(k string) (string, bool) {
 		r, s := utf8.DecodeRuneInString(k)
 		// If there is exactly one printable character, return that.
 		if s == len(k) && unicode.IsPrint(r) {
-			return strings.ToUpper(k), true
+			return key.Name(strings.ToUpper(k)), true
 		}
 		return "", false
 	}

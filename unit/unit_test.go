@@ -5,7 +5,7 @@ package unit_test
 import (
 	"testing"
 
-	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gioui/gio/unit"
 )
 
 func TestMetric_DpToSp(t *testing.T) {

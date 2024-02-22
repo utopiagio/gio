@@ -10,8 +10,8 @@ package app
 import (
 	"unsafe"
 
-	"github.com/utopiagio/gio/gpu"
-	"github.com/utopiagio/gio/internal/vk"
+	"github.com/utopiagio/gioui/gio/gpu"
+	"github.com/utopiagio/gioui/gio/internal/vk"
 )
 
 type x11VkContext struct {

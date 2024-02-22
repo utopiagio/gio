@@ -29,9 +29,9 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/utopiagio/gio/internal/f32"
-	"github.com/utopiagio/gio/internal/ops"
-	"github.com/utopiagio/gio/internal/scene"
+	"github.com/utopiagio/gioui/gio/internal/f32"
+	"github.com/utopiagio/gioui/gio/internal/ops"
+	"github.com/utopiagio/gioui/gio/internal/scene"
 )
 
 // The following are copies of types from op/clip to avoid a circular import of
