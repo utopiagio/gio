@@ -159,6 +159,7 @@ func NewWindow(options ...Option) *Window {
 	dims := decoStyle.Layout(gtx)
 	decoHeight := unit.Dp(dims.Size.Y)
 	defaultOptions := []Option{
+		Pos(-1, -1), // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
 		Size(800, 600),
 		Title("Gio"),
 		Decorated(true),
@@ -1067,6 +1068,66 @@ func Title(t string) Option {
 		cnf.Title = t
 	}
 }
+
+// **************************************************************************
+// ************ RNW Added GetAbsClientPos (image.Point) to config 01.11.2023 ************
+// GetClientPos returns the position of the client window. 
+func (w *Window) GetAbsClientPos() (x, y int) {
+	pos := w.decorations.Config.Pos
+	//pos.X += 1
+	pos.Y += w.decorations.currentHeight
+	return pos.X, pos.Y
+}
+
+// **************************************************************************
+// ************ RNW Added GetClientPos (image.Point) to config 01.11.2023 ************
+// GetClientPos returns the position of the client window. 
+func (w *Window) GetClientPos() (x, y int) {
+	return 0, 0
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetWindowPos (image.Point) to config 01.11.2023 ************
+// GetWindowPos returns the screen position of the window.
+func (w *Window) GetWindowPos() (x, y int) {
+	pos := w.decorations.Config.Pos
+	return pos.X, pos.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetClientSize (image.Point) to config 01.11.2023 ************
+// GetClientSize returns the size of the window client area.
+func (w *Window) GetClientSize() (width, height int) {
+	size := w.decorations.Config.Size
+	size.Y -= int(w.decorations.height)
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetWindowSize (image.Point) to config 01.11.2023 ************
+// GetWindowSize returns the size of the window.
+func (w *Window) GetWindowSize() (width, height int) {
+	size := w.decorations.Config.Size
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added Pos (image.Point) to config 01.11.2023 ************
+// Pos sets the position of the window. The mode will be changed to Windowed.
+func Pos(x, y unit.Dp) Option {
+	return func(m unit.Metric, cnf *Config) {
+		cnf.Mode = Windowed
+		cnf.Pos = image.Point{
+			X: m.Dp(x),
+			Y: m.Dp(y),
+		}
+	}
+}
+// **************************************************************************
 
 // Size sets the size of the window. The mode will be changed to Windowed.
 func Size(w, h unit.Dp) Option {

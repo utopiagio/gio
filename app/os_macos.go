@@ -131,6 +131,15 @@ static void closeWindow(CFTypeRef windowRef) {
 	[window performClose:nil];
 }
 
+// *************************************************************************
+// RNW Added window setPos to set window position
+static void setPos(CFTypeRef windowRef, CGFloat x, CGFloat y) {
+	NSWindow* window = (__bridge NSWindow *)windowRef;
+	NSPoint pos = NSMakePoint(x, y);
+	[window setFrameTopLeftPoint(pos);
+}
+// *************************************************************************
+
 static void setSize(CFTypeRef windowRef, CGFloat width, CGFloat height) {
 	NSWindow* window = (__bridge NSWindow *)windowRef;
 	NSSize size = NSMakeSize(width, height);
@@ -384,6 +393,14 @@ func (w *window) Configure(options []Option) {
 		}
 		w.config.Mode = Windowed
 		w.setTitle(prev, cnf)
+		// *************************************************************************
+		// RNW Added window position to update config.Pos
+		if prev.Pos != cnf.Pos {
+			w.config.Pos = cnf.Pos
+			cnf.Pos = cnf.Pos.Div(int(screenScale))
+			C.setPos(window, C.CGFloat(cnf.Pos.X), C.CGFloat(cnf.Pos.Y))
+		}
+		// *************************************************************************
 		if prev.Size != cnf.Size {
 			w.config.Size = cnf.Size
 			cnf.Size = cnf.Size.Div(int(screenScale))

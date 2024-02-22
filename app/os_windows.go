@@ -192,7 +192,15 @@ func (w *window) update() {
 		X: int(cr.Right - cr.Left),
 		Y: int(cr.Bottom - cr.Top),
 	}
-
+	// *************************************************************************
+	// RNW Added window position to update config after WM_MOVE message received
+	wr := windows.GetWindowRect(w.hwnd)
+	w.config.Pos = image.Point{
+		X: int(wr.Left),
+		Y: int(wr.Top),
+	}
+	//log.Println("windows.Rect=(", wr.Left, wr.Top, int(cr.Right - cr.Left), int(cr.Bottom - cr.Top), ")")
+	// *************************************************************************
 	w.borderSize = image.Pt(
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
@@ -703,13 +711,21 @@ func (w *window) Configure(options []Option) {
 	case Windowed:
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
+		// *******************************************************************
+		// RNW Added Get target for client area position.
+		x = int32(w.config.Pos.X) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		y = int32(w.config.Pos.Y) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		// *******************************************************************
 		// Get target for client area size.
 		width = int32(w.config.Size.X)
 		height = int32(w.config.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
-		x = wr.Left
-		y = wr.Top
+		// *******************************************************************
+		// ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		if x < 0 {x = wr.Left} 
+		if y < 0 {y = wr.Top}  
+		// *******************************************************************
 		if w.config.Decorated {
 			// Compute client size and position. Note that the client size is
 			// equal to the window size when we are in control of decorations.

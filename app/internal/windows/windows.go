@@ -265,6 +265,7 @@ const (
 	WM_MOUSEMOVE            = 0x0200
 	WM_MOUSEWHEEL           = 0x020A
 	WM_MOUSEHWHEEL          = 0x020E
+	WM_MOVE                 = 0x0003	// Added RNW 16/01/23
 	WM_NCACTIVATE           = 0x0086
 	WM_NCHITTEST            = 0x0084
 	WM_NCCALCSIZE           = 0x0083
