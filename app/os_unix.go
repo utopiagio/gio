@@ -9,7 +9,7 @@ import (
 	"errors"
 	"unsafe"
 
-	"gioui.org/io/pointer"
+	"github.com/utopiagio/gio/io/pointer"
 )
 
 // ViewEvent provides handles to the underlying window objects for the

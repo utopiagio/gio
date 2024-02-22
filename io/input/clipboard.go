@@ -5,8 +5,8 @@ package input
 import (
 	"io"
 
-	"gioui.org/io/clipboard"
-	"gioui.org/io/event"
+	"github.com/utopiagio/gio/io/clipboard"
+	"github.com/utopiagio/gio/io/event"
 )
 
 // clipboardState contains the state for clipboard event routing.

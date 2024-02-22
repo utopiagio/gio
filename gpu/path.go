@@ -11,12 +11,12 @@ import (
 	"math"
 	"unsafe"
 
-	"gioui.org/gpu/internal/driver"
-	"gioui.org/internal/byteslice"
-	"gioui.org/internal/f32"
-	"gioui.org/internal/f32color"
-	"gioui.org/shader"
-	"gioui.org/shader/gio"
+	"github.com/utopiagio/gio/gpu/internal/driver"
+	"github.com/utopiagio/gio/internal/byteslice"
+	"github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gio/shader"
+	"github.com/utopiagio/gio/shader/gio"
 )
 
 type pather struct {

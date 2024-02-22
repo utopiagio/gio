@@ -12,9 +12,9 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/gpu/internal/driver"
-	"gioui.org/internal/gl"
-	"gioui.org/shader"
+	"github.com/utopiagio/gio/gpu/internal/driver"
+	"github.com/utopiagio/gio/internal/gl"
+	"github.com/utopiagio/gio/shader"
 )
 
 // Backend implements driver.Device.

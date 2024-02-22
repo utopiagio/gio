@@ -43,7 +43,7 @@ For example, to display a blank but otherwise functional window:
 
 	package main
 
-	import "gioui.org/app"
+	import "github.com/utopiagio/gio/app"
 
 	func main() {
 		go func() {

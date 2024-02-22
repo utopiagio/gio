@@ -5,7 +5,7 @@ package gpu
 import (
 	"unsafe"
 
-	"gioui.org/cpu"
+	"github.com/utopiagio/gio/cpu"
 )
 
 // This file contains code specific to running compute shaders on the CPU.

@@ -7,8 +7,8 @@ import (
 	"image/color"
 	"testing"
 
-	"gioui.org/layout"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
 )

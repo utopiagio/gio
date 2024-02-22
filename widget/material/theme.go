@@ -7,10 +7,10 @@ import (
 
 	"golang.org/x/exp/shiny/materialdesign/icons"
 
-	"gioui.org/font"
-	"gioui.org/text"
-	"gioui.org/unit"
-	"gioui.org/widget"
+	"github.com/utopiagio/gio/font"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gio/widget"
 )
 
 // Palette contains the minimal set of colors that a widget may need to

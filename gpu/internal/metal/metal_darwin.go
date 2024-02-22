@@ -8,8 +8,8 @@ import (
 	"image"
 	"unsafe"
 
-	"gioui.org/gpu/internal/driver"
-	"gioui.org/shader"
+	"github.com/utopiagio/gio/gpu/internal/driver"
+	"github.com/utopiagio/gio/shader"
 )
 
 /*

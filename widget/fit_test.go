@@ -6,8 +6,8 @@ import (
 	"image"
 	"testing"
 
-	"gioui.org/f32"
-	"gioui.org/layout"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/layout"
 )
 
 func TestFit(t *testing.T) {

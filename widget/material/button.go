@@ -7,16 +7,16 @@ import (
 	"image/color"
 	"math"
 
-	"gioui.org/font"
-	"gioui.org/internal/f32color"
-	"gioui.org/io/semantic"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
-	"gioui.org/text"
-	"gioui.org/unit"
-	"gioui.org/widget"
+	"github.com/utopiagio/gio/font"
+	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gio/io/semantic"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gio/widget"
 )
 
 type ButtonStyle struct {

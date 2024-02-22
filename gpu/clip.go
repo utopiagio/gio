@@ -4,8 +4,8 @@ import (
 	"encoding/binary"
 	"math"
 
-	"gioui.org/internal/f32"
-	"gioui.org/internal/stroke"
+	"github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gio/internal/stroke"
 )
 
 type quadSplitter struct {

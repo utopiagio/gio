@@ -80,12 +80,12 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
-	"gioui.org/f32"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/io/transfer"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/io/transfer"
+	"github.com/utopiagio/gio/unit"
 )
 
 type ViewEvent struct {
