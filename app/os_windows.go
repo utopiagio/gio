@@ -318,6 +318,14 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// The system destroys the HWND for us.
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
+	case windows.WM_MOVE:	// lParam x, y
+		x, y := coordsFromlParam(lParam)
+		w.config.Pos = image.Point{
+			X: x,
+			Y: y,
+		}
+		w.update()
+		w.draw(true)
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
 			// Let Windows handle decorations.
