@@ -318,6 +318,9 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		// The system destroys the HWND for us.
 		w.hwnd = 0
 		windows.PostQuitMessage(0)
+// **************************************************************************
+// ******** RNW Added WM_MOVE to os.windows::windowProc 26.02.2024 **********
+// Updates position of the window after user interaction.
 	case windows.WM_MOVE:	// lParam x, y
 		x, y := coordsFromlParam(lParam)
 		w.config.Pos = image.Point{
@@ -326,6 +329,7 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		}
 		w.update()
 		w.draw(true)
+// **************************************************************************
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
 			// Let Windows handle decorations.
