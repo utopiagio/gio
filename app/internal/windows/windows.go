@@ -133,7 +133,10 @@ const (
 	CFS_POINT        = 0x0002
 	CFS_CANDIDATEPOS = 0x0040
 
-	HWND_TOPMOST = ^(uint32(1) - 1) // -1
+	//HWND_BOTTOM  = ^(uint32(1) + 1)	//+1
+	//HWND_TOP     = uint32(0)		// 0
+	HWND_TOPMOST = ^(uint32(1) - 1) //-1
+	//HWND_NOTTOPMOST = ^(uint32(1) - 2) //-2
 
 	HTCAPTION     = 2
 	HTCLIENT      = 1
@@ -298,6 +301,7 @@ const (
 	WS_MINIMIZEBOX = 0x00020000
 	WS_MAXIMIZEBOX = 0x00010000
 
+	WS_EX_TOPMOST    = 0x00000008	// Added RNW 02/03/24
 	WS_EX_APPWINDOW  = 0x00040000
 	WS_EX_WINDOWEDGE = 0x00000100
 

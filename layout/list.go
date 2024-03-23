@@ -3,6 +3,7 @@
 package layout
 
 import (
+	"log"
 	"image"
 	"math"
 
@@ -110,6 +111,7 @@ func (l *List) init(gtx Context, len int) {
 // by the callback w. Layout can handle very large lists because it only calls
 // w to fill its viewport and the distance scrolled, if any.
 func (l *List) Layout(gtx Context, len int, w ListElement) Dimensions {
+	//log.Println("layout_gio.list.Layout()")
 	l.init(gtx, len)
 	crossMin, crossMax := l.Axis.crossConstraint(gtx.Constraints)
 	gtx.Constraints = l.Axis.constraints(0, inf, crossMin, crossMax)
@@ -144,6 +146,7 @@ func (l *List) Dragging() bool {
 }
 
 func (l *List) update(gtx Context) {
+	//log.Println("layout_gio.list.update()")
 	min, max := int(-inf), int(inf)
 	if l.Position.First == 0 {
 		// Use the size of the invisible part as scroll boundary.
@@ -252,6 +255,7 @@ func (l *List) end(dims Dimensions, call op.CallOp) {
 
 // Layout the List and return its dimensions.
 func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
+	//log.Println("layout_gio.list.layout()")
 	if l.more() {
 		panic("unfinished child")
 	}
@@ -364,15 +368,16 @@ func (l *List) layout(ops *op.Ops, macro op.MacroOp) Dimensions {
 func (l *List) ScrollBy(num float32) {
 	// Split number of items into integer and fractional parts
 	i, f := math.Modf(float64(num))
-
+	//log.Println("ScrollBy Position.First:", l.Position.First)
 	// Scroll by integer amount of items
 	l.Position.First += int(i)
 
 	// Adjust Offset to account for fractional items. If Offset gets so large that it amounts to an entire item, then
 	// the layout code will handle that for us and adjust First and Offset accordingly.
 	itemHeight := float64(l.Position.Length) / float64(l.len)
+	//log.Println("ScrollBy Position.Offset:", l.Position.Offset)
 	l.Position.Offset += int(math.Round(itemHeight * f))
-
+	//log.Println("ScrollBy Position.Offset:", l.Position.Offset)
 	// First and Offset can go out of bounds, but the layout code knows how to handle that.
 
 	// Ensure that the list pays attention to the Offset field when the scrollbar drag
@@ -381,9 +386,38 @@ func (l *List) ScrollBy(num float32) {
 	l.Position.BeforeEnd = true
 }
 
+// **************************************************************************
+// *************** RNW Added ScrollOffsetBy (dx) 12.03.2024 *****************
+// ScrollOffsetBy scrolls by the specified offset. dx - pixels
+func (l *List) ScrollOffsetBy(dx int) {
+	l.Position.First = 0
+	// Adjust Offset to account for fractional items. If Offset gets so large that it amounts to an entire item, then
+	// the layout code will handle that for us and adjust First and Offset accordingly.
+	l.Position.Offset += dx
+	// First and Offset can go out of bounds, but the layout code knows how to handle that.
+
+	// Ensure that the list pays attention to the Offset field when the scrollbar drag
+	// is started while the bar is at the end of the list. Without this, the scrollbar
+	// cannot be dragged away from the end.
+	l.Position.BeforeEnd = true
+}
+// **************************************************************************
+
+// **************************************************************************
+// *************** RNW Added ScrollToOffset (dx) 12.03.2024 *****************
+// ScrollToOffset scrolls to the specified offset. dx - pixels
+func (l *List) ScrollToOffset(dx int) {
+	log.Println("layout_gio.ScrollToOffset:", dx)
+	l.Position.First = 0
+	l.Position.Offset = dx
+	l.Position.BeforeEnd = true
+}
+// **************************************************************************
+
 // ScrollTo scrolls to the specified item.
 func (l *List) ScrollTo(n int) {
 	l.Position.First = n
 	l.Position.Offset = 0
 	l.Position.BeforeEnd = true
 }
+
