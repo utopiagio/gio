@@ -288,7 +288,7 @@ func (e *Editor) processPointerEvent(gtx layout.Context, ev event.Event) (Editor
 				X: int(math.Round(float64(evt.Position.X))),
 				Y: int(math.Round(float64(evt.Position.Y))),
 			})
-			gtx.Execute(key.FocusCmd{Tag: e})
+			
 			if e.scroller.State() != gesture.StateFlinging {
 				e.scrollCaret = true
 			}

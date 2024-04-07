@@ -3,7 +3,7 @@
 package layout
 
 import (
-	"log"
+	//"log"
 	"image"
 	"math"
 
@@ -407,7 +407,6 @@ func (l *List) ScrollOffsetBy(dx int) {
 // *************** RNW Added ScrollToOffset (dx) 12.03.2024 *****************
 // ScrollToOffset scrolls to the specified offset. dx - pixels
 func (l *List) ScrollToOffset(dx int) {
-	log.Println("layout_gio.ScrollToOffset:", dx)
 	l.Position.First = 0
 	l.Position.Offset = dx
 	l.Position.BeforeEnd = true
