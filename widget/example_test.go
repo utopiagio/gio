@@ -8,15 +8,15 @@ import (
 	"io"
 	"strings"
 
-	"gioui.org/f32"
-	"gioui.org/io/event"
-	"gioui.org/io/input"
-	"gioui.org/io/pointer"
-	"gioui.org/io/transfer"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/widget"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/input"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/transfer"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/widget"
 )
 
 func ExampleClickable_passthrough() {

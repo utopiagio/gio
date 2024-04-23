@@ -9,8 +9,8 @@ import (
 	"errors"
 	"unsafe"
 
-	"gioui.org/io/event"
-	"gioui.org/io/pointer"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/pointer"
 )
 
 type X11ViewEvent struct {

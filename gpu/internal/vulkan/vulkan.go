@@ -12,8 +12,8 @@ import (
 	"image"
 	"math/bits"
 
-	"gioui.org/gpu/internal/driver"
-	"gioui.org/internal/vk"
+	"github.com/utopiagio/gio/gpu/internal/driver"
+	"github.com/utopiagio/gio/internal/vk"
 	"gioui.org/shader"
 )
 

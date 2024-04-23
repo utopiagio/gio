@@ -5,15 +5,15 @@ package widget
 import (
 	"image"
 
-	"gioui.org/f32"
-	"gioui.org/font"
-	"gioui.org/io/semantic"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
-	"gioui.org/text"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/font"
+	"github.com/utopiagio/gio/io/semantic"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
 
 	"golang.org/x/image/math/fixed"
 )

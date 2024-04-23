@@ -6,14 +6,14 @@ import (
 	"image"
 	"io"
 
-	"gioui.org/f32"
-	f32internal "gioui.org/internal/f32"
-	"gioui.org/internal/ops"
-	"gioui.org/io/event"
-	"gioui.org/io/pointer"
-	"gioui.org/io/semantic"
-	"gioui.org/io/system"
-	"gioui.org/io/transfer"
+	"github.com/utopiagio/gio/f32"
+	f32internal "github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/semantic"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/io/transfer"
 )
 
 type pointerQueue struct {

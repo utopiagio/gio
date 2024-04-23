@@ -6,11 +6,11 @@ import (
 	"image"
 	"image/color"
 
-	"gioui.org/internal/f32color"
-	"gioui.org/layout"
-	"gioui.org/op/clip"
-	"gioui.org/op/paint"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/op/paint"
+	"github.com/utopiagio/gio/unit"
 )
 
 type ProgressBarStyle struct {

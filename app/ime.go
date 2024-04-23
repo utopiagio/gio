@@ -5,8 +5,8 @@ import (
 	"unicode"
 	"unicode/utf16"
 
-	"gioui.org/io/input"
-	"gioui.org/io/key"
+	"github.com/utopiagio/gio/io/input"
+	"github.com/utopiagio/gio/io/key"
 )
 
 type editorState struct {

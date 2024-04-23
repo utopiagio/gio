@@ -6,9 +6,9 @@ import (
 	"image"
 	"math"
 
-	"gioui.org/gesture"
-	"gioui.org/op"
-	"gioui.org/op/clip"
+	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 )
 
 type scrollChild struct {
@@ -380,6 +380,34 @@ func (l *List) ScrollBy(num float32) {
 	// cannot be dragged away from the end.
 	l.Position.BeforeEnd = true
 }
+
+// **************************************************************************
+// *************** RNW Added ScrollOffsetBy (dx) 12.03.2024 *****************
+// ScrollOffsetBy scrolls by the specified offset. dx - pixels
+func (l *List) ScrollOffsetBy(dx int) {
+	l.Position.First = 0
+	// Adjust Offset to account for fractional items. If Offset gets so large that it amounts to an entire item, then
+	// the layout code will handle that for us and adjust First and Offset accordingly.
+	l.Position.Offset += dx
+	// First and Offset can go out of bounds, but the layout code knows how to handle that.
+
+	// Ensure that the list pays attention to the Offset field when the scrollbar drag
+	// is started while the bar is at the end of the list. Without this, the scrollbar
+	// cannot be dragged away from the end.
+	l.Position.BeforeEnd = true
+}
+// **************************************************************************
+
+// **************************************************************************
+// *************** RNW Added ScrollToOffset (dx) 12.03.2024 *****************
+// ScrollToOffset scrolls to the specified offset. dx - pixels
+func (l *List) ScrollToOffset(dx int) {
+	l.Position.First = 0
+	l.Position.Offset = dx
+	l.Position.BeforeEnd = true
+}
+// **************************************************************************
+
 
 // ScrollTo scrolls to the specified item.
 func (l *List) ScrollTo(n int) {

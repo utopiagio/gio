@@ -13,16 +13,16 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"gioui.org/internal/f32color"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gio/op"
 
-	"gioui.org/f32"
-	"gioui.org/io/event"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/io/transfer"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/io/transfer"
+	"github.com/utopiagio/gio/unit"
 )
 
 type JSViewEvent struct {

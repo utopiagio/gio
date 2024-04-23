@@ -7,14 +7,14 @@ import (
 	"image"
 	"image/color"
 
-	"gioui.org/io/event"
-	"gioui.org/io/key"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/op"
 
-	"gioui.org/gpu"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/unit"
 )
 
 // errOutOfDate is reported when the GPU surface dimensions or properties no
@@ -23,6 +23,11 @@ var errOutOfDate = errors.New("app: GPU surface out of date")
 
 // Config describes a Window configuration.
 type Config struct {
+	// *******************************************************************
+    // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+   	// Pos is the window position (X, Y).
+   	Pos image.Point
+	// *******************************************************************
 	// Size is the window dimensions (Width, Height).
 	Size image.Point
 	// MaxSize is the window maximum allowed dimensions.

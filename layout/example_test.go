@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"image"
 
-	"gioui.org/layout"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
 )
 
 func ExampleInset() {

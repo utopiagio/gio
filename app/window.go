@@ -3,6 +3,7 @@
 package app
 
 import (
+	//"log"
 	"errors"
 	"fmt"
 	"image"
@@ -13,22 +14,22 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"gioui.org/f32"
-	"gioui.org/font/gofont"
-	"gioui.org/gpu"
-	"gioui.org/internal/debug"
-	"gioui.org/internal/ops"
-	"gioui.org/io/event"
-	"gioui.org/io/input"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/layout"
-	"gioui.org/op"
-	"gioui.org/text"
-	"gioui.org/unit"
-	"gioui.org/widget"
-	"gioui.org/widget/material"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/font/gofont"
+	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gio/internal/debug"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/input"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/text"
+	"github.com/utopiagio/gio/unit"
+	"github.com/utopiagio/gio/widget"
+	"github.com/utopiagio/gio/widget/material"
 )
 
 // Option configures a window.
@@ -277,29 +278,39 @@ func (w *Window) Invalidate() {
 	w.basic.Invalidate()
 }
 
+
 // Option applies the options to the window. The options are hints; the platform is
 // free to ignore or adjust them.
+// **************************************************************************
+// ************ RNW Added check if driver running 15.04.2024 ************
 func (w *Window) Option(opts ...Option) {
 	if len(opts) == 0 {
 		return
 	}
-	w.init(opts...)
-	w.Run(func() {
-		cnf := Config{Decorated: w.decorations.enabled}
-		for _, opt := range opts {
-			opt(w.metric, &cnf)
-		}
-		w.decorations.enabled = cnf.Decorated
-		decoHeight := w.decorations.height
-		if !w.decorations.enabled {
-			decoHeight = 0
-		}
-		opts = append(opts, decoHeightOpt(decoHeight))
-		w.driver.Configure(opts)
-		w.setNextFrame(time.Time{})
-		w.updateAnimation()
-	})
+	// Only run init once on first call to new Window object
+	if w.driver == nil {
+		w.init(opts...)
+	} else {
+	// Dont run Run() function to update config on first call
+	// Config is updated after WM_MOVE and WM_SIZE messages received
+		w.Run(func() {
+			cnf := Config{Decorated: w.decorations.enabled}
+			for _, opt := range opts {
+				opt(w.metric, &cnf)
+			}
+			w.decorations.enabled = cnf.Decorated
+			decoHeight := w.decorations.height
+			if !w.decorations.enabled {
+				decoHeight = 0
+			}
+			opts = append(opts, decoHeightOpt(decoHeight))
+			w.driver.Configure(opts)
+			w.setNextFrame(time.Time{})
+			w.updateAnimation()
+		})
+	}
 }
+// *************************************************************************	
 
 // Run f in the same thread as the native window event loop, and wait for f to
 // return or the window to close.
@@ -687,7 +698,9 @@ func (w *Window) Event() event.Event {
 }
 
 func (w *Window) init(initial ...Option) {
+
 	w.once.Do(func() {
+		//fmt.Println("Window.init().........")
 		debug.Parse()
 		// Measure decoration height.
 		deco := new(widget.Decorations)
@@ -704,6 +717,7 @@ func (w *Window) init(initial ...Option) {
 		dims := decoStyle.Layout(gtx)
 		decoHeight := unit.Dp(dims.Size.Y)
 		defaultOptions := []Option{
+			Pos(-10000, -10000), // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
 			Size(800, 600),
 			Title("Gio"),
 			Decorated(true),
@@ -829,8 +843,89 @@ func Title(t string) Option {
 	}
 }
 
-// Size sets the size of the window. The mode will be changed to Windowed.
-func Size(w, h unit.Dp) Option {
+// **************************************************************************
+// ************ RNW Added GetAbsClientPos (image.Point) to config 01.11.2023 ************
+// GetClientPos returns the position of the client window in device pixels. 
+func (w *Window) GetAbsClientPos() (xPx int, yPx int) {
+	pos := w.decorations.Config.Pos		// deco.Config.Pos specified in screen pixels
+	pos.Y += w.metric.Dp(w.decorations.height) // convert deco.height to screen pixels specified in device pixels // deco.currentHeight specified in device pixels
+	return pos.X, pos.Y
+}
+
+// **************************************************************************
+// ************ RNW Added GetClientPos (image.Point) to config 01.11.2023 ************
+// GetClientPos returns the position of the client window in screen pixels. 
+func (w *Window) GetClientPos() (xPx int, yPx int) {
+	return 0, 0
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetWindowSize (image.Point) to config 01.11.2023 ************
+// GetWindowSize returns the size of the window in screen pixels.
+func (w *Window) GetSize() (widthPx int, heightPx int) {
+	size := w.decorations.Config.Size		// deco.Config.Pos specified as image.Point in screen pixels
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetPos (x, y) to config 18.04.2024 ************
+// GetPos returns the position of the client window in device pixels. 
+func (w *Window) GetPos() (xPx int, yPx int) {
+	//return w.XDp, w.YDp
+	pos := w.decorations.Config.Pos		// deco.Config.Pos specified as image.Point in screen pixels
+	//xDp = w.metric.PxToDp(pos.X)
+	//yDp = w.metric.PxToDp(pos.Y)
+	//yDp += w.metric.Dp(w.decorations.height) // add deco.height
+	return pos.X, pos.Y
+}
+
+// **************************************************************************
+// ************ RNW Added GetWindowPos (int, int) to config 18.04.2024 ************
+// GetWindowPos returns the screen position of the window in screen pixels.
+func (w *Window) GetWindowPos() (xPx int, yPx int) {
+	pos := w.decorations.Config.Pos		// deco.Config.Pos specified in screen pixels
+	return pos.X, pos.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetClientSize (image.Point) to config 01.11.2023 ************
+// GetClientSize returns the size of the window client area in screen pixels.
+func (w *Window) GetClientSize() (widthPx int, heightPx int) {
+	size := w.decorations.Config.Size 			// deco.Config.size specified in screen pixels
+	size.Y -= w.metric.Dp(w.decorations.height) // convert deco.height to screen pixels specified in device pixels
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added GetWindowSize (image.Point) to config 01.11.2023 ************
+// GetWindowSize returns the size of the window in screen pixels.
+func (w *Window) GetWindowSize() (widthPx int, heightPx int) {
+	size := w.decorations.Config.Size 	// deco.Config.size is specified in screen pixels
+	return size.X, size.Y
+}
+// **************************************************************************
+
+// **************************************************************************
+// ************ RNW Added Pos (image.Point) to config 01.11.2023 ************
+// Pos sets the position of the window, position specified in device pixels. The mode will be changed to Windowed.
+func Pos(x, y int) Option {
+	return func(m unit.Metric, cnf *Config) {
+		cnf.Mode = Windowed
+		cnf.Pos = image.Point{
+			X: x,			// image.Point.X in pixels
+			Y: y,			// image.Point.Y in pixels
+		}
+	}
+}
+// **************************************************************************
+
+
+// Size sets the size of the window, size specified in device pixels. The mode will be changed to Windowed.
+func Size(w, h int) Option {
 	if w <= 0 {
 		panic("width must be larger than or equal to 0")
 	}
@@ -839,9 +934,9 @@ func Size(w, h unit.Dp) Option {
 	}
 	return func(m unit.Metric, cnf *Config) {
 		cnf.Mode = Windowed
-		cnf.Size = image.Point{
-			X: m.Dp(w),
-			Y: m.Dp(h),
+		cnf.Size = image.Point{	
+			X: w,			// image.Point.X in pixels
+			Y: h,			// image.Point.Y in pixels
 		}
 	}
 }

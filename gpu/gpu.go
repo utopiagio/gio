@@ -18,23 +18,23 @@ import (
 	"time"
 	"unsafe"
 
-	"gioui.org/gpu/internal/driver"
-	"gioui.org/internal/byteslice"
-	"gioui.org/internal/f32"
-	"gioui.org/internal/f32color"
-	"gioui.org/internal/ops"
-	"gioui.org/internal/scene"
-	"gioui.org/internal/stroke"
-	"gioui.org/layout"
-	"gioui.org/op"
+	"github.com/utopiagio/gio/gpu/internal/driver"
+	"github.com/utopiagio/gio/internal/byteslice"
+	"github.com/utopiagio/gio/internal/f32"
+	"github.com/utopiagio/gio/internal/f32color"
+	"github.com/utopiagio/gio/internal/ops"
+	"github.com/utopiagio/gio/internal/scene"
+	"github.com/utopiagio/gio/internal/stroke"
+	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
 	"gioui.org/shader"
 	"gioui.org/shader/gio"
 
 	// Register backends.
-	_ "gioui.org/gpu/internal/d3d11"
-	_ "gioui.org/gpu/internal/metal"
-	_ "gioui.org/gpu/internal/opengl"
-	_ "gioui.org/gpu/internal/vulkan"
+	_ "github.com/utopiagio/gio/gpu/internal/d3d11"
+	_ "github.com/utopiagio/gio/gpu/internal/metal"
+	_ "github.com/utopiagio/gio/gpu/internal/opengl"
+	_ "github.com/utopiagio/gio/gpu/internal/vulkan"
 )
 
 type GPU interface {

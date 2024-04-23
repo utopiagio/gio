@@ -18,17 +18,17 @@ import (
 
 	syscall "golang.org/x/sys/windows"
 
-	"gioui.org/app/internal/windows"
-	"gioui.org/op"
-	"gioui.org/unit"
+	"github.com/utopiagio/gio/app/internal/windows"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/unit"
 	gowindows "golang.org/x/sys/windows"
 
-	"gioui.org/f32"
-	"gioui.org/io/event"
-	"gioui.org/io/key"
-	"gioui.org/io/pointer"
-	"gioui.org/io/system"
-	"gioui.org/io/transfer"
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/key"
+	"github.com/utopiagio/gio/io/pointer"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/io/transfer"
 )
 
 type Win32ViewEvent struct {
@@ -90,6 +90,7 @@ func osMain() {
 }
 
 func newWindow(win *callbacks, options []Option) {
+	//fmt.Println("newWindow............")
 	done := make(chan struct{})
 	go func() {
 		// GetMessage and PeekMessage can filter on a window HWND, but
@@ -193,15 +194,31 @@ func (w *window) init() error {
 // If anything has changed it emits a ConfigEvent to notify the application.
 func (w *window) update() {
 	cr := windows.GetClientRect(w.hwnd)
+	//fmt.Println("w.GetClientRect=", cr.Left, ",", cr.Top, ",", cr.Right - cr.Left, ",", cr.Bottom - cr.Top, ",", ")")
 	w.config.Size = image.Point{
 		X: int(cr.Right - cr.Left),
 		Y: int(cr.Bottom - cr.Top),
 	}
+	//fmt.Println("w.client.Size Width=", w.config.Size.X, "Height=", w.config.Size.Y, ")")
+	// *************************************************************************
+	// RNW Added window position to update config after WM_MOVE message received
+	wr := windows.GetWindowRect(w.hwnd)
+	//fmt.Println("w.GetWindowRect=", wr.Left, ",", wr.Top, ",", wr.Right - wr.Left, ",", wr.Bottom - wr.Top, ",", ")")
+	w.config.Pos = image.Point{
+		X: int(wr.Left),
+		Y: int(wr.Top),
+	}
+	//X := int(wr.Right - wr.Left)
+	//Y := int(wr.Bottom - wr.Top)
 
+	//fmt.Println("w.window.Pos X=", w.config.Pos.X, "Y=", w.config.Pos.Y, ")")
+	//fmt.Println("w.window.Size Width=", X, "Height=", Y, ")")
+	// *************************************************************************
 	w.borderSize = image.Pt(
 		windows.GetSystemMetrics(windows.SM_CXSIZEFRAME),
 		windows.GetSystemMetrics(windows.SM_CYSIZEFRAME),
 	)
+	//fmt.Println("w.borderSize X=", w.borderSize.X, "Y=", w.borderSize.Y, ")")
 	w.ProcessEvent(ConfigEvent{Config: w.config})
 }
 
@@ -309,6 +326,13 @@ func windowProc(hwnd syscall.Handle, msg uint32, wParam, lParam uintptr) uintptr
 		w.hwnd = 0
 		w.invMu.Unlock()
 		windows.PostQuitMessage(0)
+// **************************************************************************
+// ******** RNW Added WM_MOVE to os.windows::windowProc 26.02.2024 **********
+// Updates position of the window after user interaction.
+	case windows.WM_MOVE:
+		w.update()
+		w.draw(true)	// DANGER! force window redraw in between move events 
+// **************************************************************************
 	case windows.WM_NCCALCSIZE:
 		if w.config.Decorated {
 			// Let Windows handle decorations.
@@ -716,17 +740,25 @@ func (w *window) Configure(options []Option) {
 		style |= winStyle
 		swpStyle |= windows.SWP_NOMOVE | windows.SWP_NOSIZE
 		showMode = windows.SW_SHOWMAXIMIZED
-
 	case Windowed:
 		style |= winStyle
 		showMode = windows.SW_SHOWNORMAL
+		// *******************************************************************
+		// RNW Added Get target position for client area position.
+		x = int32(w.config.Pos.X) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		y = int32(w.config.Pos.Y) // ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		// *******************************************************************
+
 		// Get target for client area size.
 		width = int32(w.config.Size.X)
 		height = int32(w.config.Size.Y)
 		// Get the current window size and position.
 		wr := windows.GetWindowRect(w.hwnd)
-		x = wr.Left
-		y = wr.Top
+		// *******************************************************************
+		// ******** RNW Added Pos (image.Point) to config 01.11.2023 *********
+		if x < -9999 {x = wr.Left} 	//int32(-w.borderSize.X) {x = wr.Left} 
+		if y < -9999 {y = wr.Top}  
+		// *******************************************************************
 		if w.config.Decorated {
 			// Compute client size and position. Note that the client size is
 			// equal to the window size when we are in control of decorations.
@@ -754,7 +786,6 @@ func (w *window) Configure(options []Option) {
 	windows.SetWindowLong(w.hwnd, windows.GWL_STYLE, style)
 	windows.SetWindowPos(w.hwnd, 0, x, y, width, height, swpStyle)
 	windows.ShowWindow(w.hwnd, showMode)
-
 	w.update()
 }
 

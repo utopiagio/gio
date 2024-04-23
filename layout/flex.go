@@ -5,7 +5,7 @@ package layout
 import (
 	"image"
 
-	"gioui.org/op"
+	"github.com/utopiagio/gio/op"
 )
 
 // Flex lays out child elements along an axis,
@@ -24,10 +24,16 @@ type Flex struct {
 	WeightSum float32
 }
 
+// RNW Modified
+// hflex horizontal flex style. hflex=true->Flexed(hflex child) : hflex=false->Rigid(hflex child)
+// vflex vertical flex style. vflex=true->Flexed(vflex child) : vflex=false->Rigid(vflex child)
+// ********************************************
 // FlexChild is the descriptor for a Flex child.
 type FlexChild struct {
-	flex   bool
-	weight float32
+	//flex 	bool
+	hflex   bool
+	vflex	bool
+	weight 	float32
 
 	widget Widget
 
@@ -57,30 +63,65 @@ const (
 	SpaceEvenly
 )
 
-// Rigid returns a Flex child with a maximal constraint of the
-// remaining space.
-func Rigid(widget Widget) FlexChild {
+// RNW Modified
+// hflex horizontal flex style
+// vflex vertical flex style
+// *********************************************
+// FlexControl returns a Flex child with a combination of flex or rigid axis
+func FlexControl(hflex bool, vflex bool, weight float32, widget Widget) FlexChild {
 	return FlexChild{
+		//flex:	false,
+		hflex:  hflex,
+		vflex: 	vflex,
+		weight: weight,
 		widget: widget,
 	}
 }
 
+// RNW Modified
+// hflex horizontal flex style defaults to false
+// vflex vertical flex style defaults to false
+// *********************************************
+// Rigid returns a Flex child and a maximal constraint of the
+// remaining space.
+func Rigid(widget Widget) FlexChild {
+	return FlexChild{
+		//flex:	false,
+		hflex:  false,
+		vflex: 	false,
+		weight: 0,
+		widget: widget,
+	}
+}
+
+// RNW Modified
+// hflex horizontal flex style defaults to true
+// vflex vertical flex style defaults to true
+// ********************************************
 // Flexed returns a Flex child forced to take up weight fraction of the
 // space left over from Rigid children. The fraction is weight
 // divided by either the weight sum of all Flexed children or the Flex
 // WeightSum if non zero.
 func Flexed(weight float32, widget Widget) FlexChild {
 	return FlexChild{
-		flex:   true,
+		//flex: 	true,
+		hflex:  true,
+		vflex:	true,
 		weight: weight,
 		widget: widget,
 	}
 }
 
+// RNW Modified to enable fixed or expanded contexts in both axis
+// hflex horizontal flex style
+// vflex vertical flex style
+// if vflex == false {crossMin = 0}
+// **********************************************
 // Layout a list of children. The position of the children are
 // determined by the specified order, but Rigid children are laid out
 // before Flexed children.
 func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
+	var crossMinRigid int
 	size := 0
 	cs := gtx.Constraints
 	mainMin, mainMax := f.Axis.mainConstraint(cs)
@@ -90,12 +131,17 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	cgtx := gtx
 	// Lay out Rigid children.
 	for i, child := range children {
-		if child.flex {
+		if child.hflex {
 			totalWeight += child.weight
 			continue
 		}
 		macro := op.Record(gtx.Ops)
-		cgtx.Constraints = f.Axis.constraints(0, remaining, crossMin, crossMax)
+		if child.vflex == false {
+			crossMinRigid = 0
+		} else {
+			crossMinRigid = crossMin
+		}
+		cgtx.Constraints = f.Axis.constraints(0, remaining, crossMinRigid, crossMax)
 		dims := child.widget(cgtx)
 		c := macro.Stop()
 		sz := f.Axis.Convert(dims.Size).X
@@ -115,7 +161,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	flexTotal := remaining
 	// Lay out Flexed children.
 	for i, child := range children {
-		if !child.flex {
+		if !child.hflex {
 			continue
 		}
 		var flexSize int
@@ -130,6 +176,9 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			}
 		}
 		macro := op.Record(gtx.Ops)
+		if child.vflex == false {
+			crossMin = 0
+		}
 		cgtx.Constraints = f.Axis.constraints(flexSize, flexSize, crossMin, crossMax)
 		dims := child.widget(cgtx)
 		c := macro.Stop()

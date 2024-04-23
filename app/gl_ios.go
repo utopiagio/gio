@@ -33,8 +33,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"gioui.org/gpu"
-	"gioui.org/internal/gl"
+	"github.com/utopiagio/gio/gpu"
+	"github.com/utopiagio/gio/internal/gl"
 )
 
 type context struct {

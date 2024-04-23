@@ -265,6 +265,7 @@ const (
 	WM_MOUSEMOVE            = 0x0200
 	WM_MOUSEWHEEL           = 0x020A
 	WM_MOUSEHWHEEL          = 0x020E
+	WM_MOVE                 = 0x0003	// Added RNW 16/01/23
 	WM_NCACTIVATE           = 0x0086
 	WM_NCHITTEST            = 0x0084
 	WM_NCCALCSIZE           = 0x0083
@@ -296,7 +297,8 @@ const (
 	WS_THICKFRAME  = 0x00040000
 	WS_MINIMIZEBOX = 0x00020000
 	WS_MAXIMIZEBOX = 0x00010000
-
+	
+	WS_EX_TOPMOST    = 0x00000008	// Added RNW 02/03/24
 	WS_EX_APPWINDOW  = 0x00040000
 	WS_EX_WINDOWEDGE = 0x00000100
 
@@ -525,7 +527,8 @@ func GetSystemDPI() int {
 	// Check for GetDpiForMonitor, introduced in Windows 8.1.
 	if _GetDpiForMonitor.Find() == nil {
 		hmon := monitorFromPoint(Point{}, MONITOR_DEFAULTTOPRIMARY)
-		return getDpiForMonitor(hmon, MDT_EFFECTIVE_DPI)
+		dpi := getDpiForMonitor(hmon, MDT_EFFECTIVE_DPI)
+		return dpi
 	} else {
 		// Fall back to the physical device DPI.
 		screenDC, err := GetDC(0)
