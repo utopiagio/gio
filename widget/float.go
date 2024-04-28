@@ -9,11 +9,6 @@ import (
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op/clip"
-
-	//"gioui.org/gesture"
-	//"gioui.org/io/pointer"
-	//"gioui.org/layout"
-	//"gioui.org/op/clip"
 	"github.com/utopiagio/gio/unit"
 )
 
@@ -53,7 +48,11 @@ func (f *Float) Layout(gtx layout.Context, axis layout.Axis, pointerMargin unit.
 // The range of f is set by the minimum constraints main axis value.
 func (f *Float) Update(gtx layout.Context) bool {
 	changed := false
-	for _, e := range f.drag.Update(gtx.Metric, gtx, gesture.Axis(f.axis)) {
+	for {
+		e, ok := f.drag.Update(gtx.Metric, gtx.Source, gesture.Axis(f.axis))
+		if !ok {
+			break
+		}
 		if f.length > 0 && (e.Kind == pointer.Press || e.Kind == pointer.Drag) {
 			pos := e.Position.X
 			if f.axis == layout.Vertical {

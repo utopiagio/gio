@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/bits"
 
-	"github.com/utopiagio/gio/gesture"
 	"github.com/utopiagio/gio/io/system"
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op/clip"
@@ -12,11 +11,7 @@ import (
 
 // Decorations handles the states of window decorations.
 type Decorations struct {
-	clicks map[int]*Clickable
-	resize [8]struct {
-		gesture.Hover
-		gesture.Drag
-	}
+	clicks    map[int]*Clickable
 	maximized bool
 }
 

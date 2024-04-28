@@ -15,17 +15,8 @@ import (
 	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/op/clip"
 	"github.com/utopiagio/gio/op/paint"
-	"github.com/utopiagio/gio/widget/material"
-
-	//"gioui.org/f32"
-	//"gioui.org/font/gofont"
-	//"gioui.org/gpu/headless"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/op/clip"
-	//"gioui.org/op/paint"
 	"github.com/utopiagio/gio/text"
-	//"gioui.org/widget/material"
+	"github.com/utopiagio/gio/widget/material"
 )
 
 // use some global variables for benchmarking so as to not pollute

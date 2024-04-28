@@ -5,6 +5,7 @@ import (
 
 	"github.com/utopiagio/gio/f32"
 	"github.com/utopiagio/gio/gesture"
+	"github.com/utopiagio/gio/io/event"
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/io/transfer"
 	"github.com/utopiagio/gio/layout"
@@ -17,24 +18,20 @@ type Draggable struct {
 	// Type contains the MIME type and matches transfer.SourceOp.
 	Type string
 
-	handle struct{}
-	drag   gesture.Drag
-	click  f32.Point
-	pos    f32.Point
+	drag  gesture.Drag
+	click f32.Point
+	pos   f32.Point
 }
 
 func (d *Draggable) Layout(gtx layout.Context, w, drag layout.Widget) layout.Dimensions {
-	if gtx.Queue == nil {
+	if !gtx.Enabled() {
 		return w(gtx)
 	}
 	dims := w(gtx)
 
 	stack := clip.Rect{Max: dims.Size}.Push(gtx.Ops)
 	d.drag.Add(gtx.Ops)
-	transfer.SourceOp{
-		Tag:  &d.handle,
-		Type: d.Type,
-	}.Add(gtx.Ops)
+	event.Op(gtx.Ops, d)
 	stack.Pop()
 
 	if drag != nil && d.drag.Pressed() {
@@ -56,7 +53,11 @@ func (d *Draggable) Dragging() bool {
 // requested to offer data, if any
 func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	pos := d.pos
-	for _, ev := range d.drag.Update(gtx.Metric, gtx.Queue, gesture.Both) {
+	for {
+		ev, ok := d.drag.Update(gtx.Metric, gtx.Source, gesture.Both)
+		if !ok {
+			break
+		}
 		switch ev.Kind {
 		case pointer.Press:
 			d.click = ev.Position
@@ -67,8 +68,12 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 	}
 	d.pos = pos
 
-	for _, ev := range gtx.Queue.Events(&d.handle) {
-		if e, ok := ev.(transfer.RequestEvent); ok {
+	for {
+		e, ok := gtx.Event(transfer.SourceFilter{Target: d, Type: d.Type})
+		if !ok {
+			break
+		}
+		if e, ok := e.(transfer.RequestEvent); ok {
 			return e.Type, true
 		}
 	}
@@ -77,12 +82,8 @@ func (d *Draggable) Update(gtx layout.Context) (mime string, requested bool) {
 
 // Offer the data ready for a drop. Must be called after being Requested.
 // The mime must be one in the requested list.
-func (d *Draggable) Offer(ops *op.Ops, mime string, data io.ReadCloser) {
-	transfer.OfferOp{
-		Tag:  &d.handle,
-		Type: mime,
-		Data: data,
-	}.Add(ops)
+func (d *Draggable) Offer(gtx layout.Context, mime string, data io.ReadCloser) {
+	gtx.Execute(transfer.OfferCmd{Tag: d, Type: mime, Data: data})
 }
 
 // Pos returns the drag position relative to its initial click position.

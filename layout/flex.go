@@ -30,6 +30,7 @@ type Flex struct {
 // ********************************************
 // FlexChild is the descriptor for a Flex child.
 type FlexChild struct {
+	//flex 	bool
 	hflex   bool
 	vflex	bool
 	weight 	float32
@@ -101,7 +102,8 @@ func Rigid(widget Widget) FlexChild {
 // WeightSum if non zero.
 func Flexed(weight float32, widget Widget) FlexChild {
 	return FlexChild{
-		hflex:   true,
+		//flex: 	true,
+		hflex:  true,
 		vflex:	true,
 		weight: weight,
 		widget: widget,
@@ -117,7 +119,6 @@ func Flexed(weight float32, widget Widget) FlexChild {
 // determined by the specified order, but Rigid children are laid out
 // before Flexed children.
 func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
-	//log.Println("Flex.Layout()...........")
 	var crossMinRigid int
 	size := 0
 	cs := gtx.Constraints
@@ -129,14 +130,13 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	cgtx := gtx
 	// Lay out Rigid children.
 	for i, child := range children {
-		if child.hflex == true {
+		if child.hflex {
 			totalWeight += child.weight
 			continue
 		}
 		//log.Println("rigid child.idx =", i)
 		//log.Println("rigid child.hflex =", child.hflex)
 		macro := op.Record(gtx.Ops)
-		//log.Println("rigid child.vflex =", child.vflex)
 		if child.vflex == false {
 			crossMinRigid = 0
 		} else {
@@ -163,9 +163,7 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 	//log.Println("layout Flex......")
 	// Lay out Flexed children.
 	for i, child := range children {
-		//log.Println("flex child.idx =", i)
-		//log.Println("flex child.hflex =", child.hflex)
-		if child.hflex == false {
+		if !child.hflex {
 			continue
 		}
 		var flexSize int
@@ -180,7 +178,6 @@ func (f Flex) Layout(gtx Context, children ...FlexChild) Dimensions {
 			}
 		}
 		macro := op.Record(gtx.Ops)
-		//log.Println("flex child.vflex =", child.vflex)
 		if child.vflex == false {
 			crossMin = 0
 		}

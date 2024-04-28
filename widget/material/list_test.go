@@ -3,37 +3,27 @@ package material_test
 import (
 	"image"
 	"testing"
-	"time"
 
-	//"github.com/utopiagio/gio/font/gofont"
-	"github.com/utopiagio/gio/io/system"
+
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/unit"
 	"github.com/utopiagio/gio/widget"
 	"github.com/utopiagio/gio/widget/material"
-
-	//"gioui.org/io/system"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
-	//"gioui.org/widget/material"
 )
 
 func TestListAnchorStrategies(t *testing.T) {
-	var ops op.Ops
-	gtx := layout.NewContext(&ops, system.FrameEvent{
+	gtx := layout.Context{
+		Ops: new(op.Ops),
 		Metric: unit.Metric{
 			PxPerDp: 1,
 			PxPerSp: 1,
 		},
-		Now: time.Now(),
-		Size: image.Point{
+		Constraints: layout.Exact(image.Point{
 			X: 500,
 			Y: 500,
-		},
-	})
+		}),
+	}
 	gtx.Constraints.Min = image.Point{}
 
 	var spaceConstraints layout.Constraints

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package router
+package input
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/io/event"
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/io/semantic"
 	"github.com/utopiagio/gio/op"
@@ -74,13 +75,19 @@ func TestSemanticTree(t *testing.T) {
 
 func TestSemanticDescription(t *testing.T) {
 	var ops op.Ops
-	pointer.InputOp{Tag: new(int), Kinds: pointer.Press | pointer.Release}.Add(&ops)
+
+	h := new(int)
+	event.Op(&ops, h)
 	semantic.DescriptionOp("description").Add(&ops)
 	semantic.LabelOp("label").Add(&ops)
 	semantic.Button.Add(&ops)
 	semantic.EnabledOp(false).Add(&ops)
 	semantic.SelectedOp(true).Add(&ops)
 	var r Router
+	events(&r, -1, pointer.Filter{
+		Target: h,
+		Kinds:  pointer.Press | pointer.Release,
+	})
 	r.Frame(&ops)
 	tree := r.AppendSemantics(nil)
 	got := tree[0].Desc

@@ -2,9 +2,11 @@ package widget
 
 import (
 	"image"
+	"io"
 	"math"
 	"strings"
 
+	"github.com/utopiagio/gio/font"
 	"github.com/utopiagio/gio/gesture"
 	"github.com/utopiagio/gio/io/clipboard"
 	"github.com/utopiagio/gio/io/event"
@@ -12,22 +14,10 @@ import (
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/io/system"
 	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/op/clip"
 	"github.com/utopiagio/gio/text"
 	"github.com/utopiagio/gio/unit"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/gesture"
-	//"gioui.org/io/clipboard"
-	//"gioui.org/io/event"
-	//"gioui.org/io/key"
-	//"gioui.org/io/pointer"
-	//"gioui.org/io/system"
-	//"gioui.org/layout"
-	"github.com/utopiagio/gio/op"
-	//"gioui.org/op/clip"
-	//"gioui.org/text"
-	//"gioui.org/unit"
 )
 
 // stringSource is an immutable textSource with a fixed string
@@ -81,21 +71,14 @@ type Selectable struct {
 	source          stringSource
 	// scratch is a buffer reused to efficiently read text out of the
 	// textView.
-	scratch      []byte
-	lastValue    string
-	text         textView
-	focused      bool
-	requestFocus bool
-	dragging     bool
-	dragger      gesture.Drag
-	scroller     gesture.Scroll
-	scrollOff    image.Point
+	scratch   []byte
+	lastValue string
+	text      textView
+	focused   bool
+	dragging  bool
+	dragger   gesture.Drag
 
 	clicker gesture.Click
-	// events is the list of events not yet processed.
-	events []EditorEvent
-	// prevEvents is the number of events from the previous frame.
-	prevEvents int
 }
 
 // initialize must be called at the beginning of any exported method that
@@ -107,11 +90,6 @@ func (l *Selectable) initialize() {
 		l.text.SetSource(l.source)
 		l.initialized = true
 	}
-}
-
-// Focus requests the input focus for the label.
-func (l *Selectable) Focus() {
-	l.requestFocus = true
 }
 
 // Focused returns whether the label is focused or not.
@@ -193,10 +171,11 @@ func (l *Selectable) Truncated() bool {
 	return l.text.Truncated()
 }
 
-// Update the state of the selectable in response to input events.
-func (l *Selectable) Update(gtx layout.Context) {
+// Update the state of the selectable in response to input events. It returns whether the
+// text selection changed during event processing.
+func (l *Selectable) Update(gtx layout.Context) bool {
 	l.initialize()
-	l.handleEvents(gtx)
+	return l.handleEvents(gtx)
 }
 
 // Layout clips to the dimensions of the selectable, updates the shaped text, configures input handling, and paints
@@ -214,17 +193,7 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	dims := l.text.Dimensions()
 	defer clip.Rect(image.Rectangle{Max: dims.Size}).Push(gtx.Ops).Pop()
 	pointer.CursorText.Add(gtx.Ops)
-	var keys key.Set
-	if l.focused {
-		const keyFilter = "(ShortAlt)-(Shift)-[←,→,↑,↓]|(Shift)-[⇞,⇟,⇱,⇲]|Short-[C,X,A]"
-		keys = keyFilter
-	}
-	key.InputOp{Tag: l, Keys: keys}.Add(gtx.Ops)
-	if l.requestFocus {
-		key.FocusOp{Tag: l}.Add(gtx.Ops)
-		key.SoftKeyboardOp{Show: true}.Add(gtx.Ops)
-	}
-	l.requestFocus = false
+	event.Op(gtx.Ops, l)
 
 	l.clicker.Add(gtx.Ops)
 	l.dragger.Add(gtx.Ops)
@@ -234,18 +203,16 @@ func (l *Selectable) Layout(gtx layout.Context, lt *text.Shaper, font font.Font,
 	return dims
 }
 
-func (l *Selectable) handleEvents(gtx layout.Context) {
-	// Flush events from before the previous Layout.
-	n := copy(l.events, l.events[l.prevEvents:])
-	l.events = l.events[:n]
-	l.prevEvents = n
+func (l *Selectable) handleEvents(gtx layout.Context) (selectionChanged bool) {
 	oldStart, oldLen := min(l.text.Selection()), l.text.SelectionLen()
+	defer func() {
+		if newStart, newLen := min(l.text.Selection()), l.text.SelectionLen(); oldStart != newStart || oldLen != newLen {
+			selectionChanged = true
+		}
+	}()
 	l.processPointer(gtx)
 	l.processKey(gtx)
-	// Queue a SelectEvent if the selection changed, including if it went away.
-	if newStart, newLen := min(l.text.Selection()), l.text.SelectionLen(); oldStart != newStart || oldLen != newLen {
-		l.events = append(l.events, SelectEvent{})
-	}
+	return selectionChanged
 }
 
 func (e *Selectable) processPointer(gtx layout.Context) {
@@ -260,7 +227,7 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 					X: int(math.Round(float64(evt.Position.X))),
 					Y: int(math.Round(float64(evt.Position.Y))),
 				})
-				e.requestFocus = true
+				gtx.Execute(key.FocusCmd{Tag: e})
 				if evt.Modifiers == key.ModShift {
 					start, end := e.text.Selection()
 					// If they clicked closer to the end, then change the end to
@@ -309,17 +276,44 @@ func (e *Selectable) processPointer(gtx layout.Context) {
 
 func (e *Selectable) clickDragEvents(gtx layout.Context) []event.Event {
 	var combinedEvents []event.Event
-	for _, evt := range e.clicker.Update(gtx) {
+	for {
+		evt, ok := e.clicker.Update(gtx.Source)
+		if !ok {
+			break
+		}
 		combinedEvents = append(combinedEvents, evt)
 	}
-	for _, evt := range e.dragger.Update(gtx.Metric, gtx, gesture.Both) {
+	for {
+		evt, ok := e.dragger.Update(gtx.Metric, gtx.Source, gesture.Both)
+		if !ok {
+			break
+		}
 		combinedEvents = append(combinedEvents, evt)
 	}
 	return combinedEvents
 }
 
 func (e *Selectable) processKey(gtx layout.Context) {
-	for _, ke := range gtx.Events(e) {
+	for {
+		ke, ok := gtx.Event(
+			key.FocusFilter{Target: e},
+			key.Filter{Focus: e, Name: key.NameLeftArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Focus: e, Name: key.NameRightArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Focus: e, Name: key.NameUpArrow, Optional: key.ModShortcutAlt | key.ModShift},
+			key.Filter{Focus: e, Name: key.NameDownArrow, Optional: key.ModShortcutAlt | key.ModShift},
+
+			key.Filter{Focus: e, Name: key.NamePageUp, Optional: key.ModShift},
+			key.Filter{Focus: e, Name: key.NamePageDown, Optional: key.ModShift},
+			key.Filter{Focus: e, Name: key.NameEnd, Optional: key.ModShift},
+			key.Filter{Focus: e, Name: key.NameHome, Optional: key.ModShift},
+
+			key.Filter{Focus: e, Name: "C", Required: key.ModShortcut},
+			key.Filter{Focus: e, Name: "X", Required: key.ModShortcut},
+			key.Filter{Focus: e, Name: "A", Required: key.ModShortcut},
+		)
+		if !ok {
+			break
+		}
 		switch ke := ke.(type) {
 		case key.FocusEvent:
 			e.focused = ke.Focus
@@ -348,7 +342,7 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 		case "C", "X":
 			e.scratch = e.text.SelectedText(e.scratch)
 			if text := string(e.scratch); text != "" {
-				clipboard.WriteOp{Text: text}.Add(gtx.Ops)
+				gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
 			}
 		// Select all
 		case "A":
@@ -388,14 +382,6 @@ func (e *Selectable) command(gtx layout.Context, k key.Event) {
 	case key.NameEnd:
 		e.text.MoveEnd(selAct)
 	}
-}
-
-// Events returns available text events.
-func (l *Selectable) Events() []EditorEvent {
-	events := l.events
-	l.events = nil
-	l.prevEvents = 0
-	return events
 }
 
 // Regions returns visible regions covering the rune range [start,end).

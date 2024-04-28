@@ -44,14 +44,10 @@ type GPU interface {
 	Clear(color color.NRGBA)
 	// Frame draws the graphics operations from op into a viewport of target.
 	Frame(frame *op.Ops, target RenderTarget, viewport image.Point) error
-	// Profile returns the last available profiling information. Profiling
-	// information is requested when Frame sees an io/profile.Op, and the result
-	// is available through Profile at some later time.
-	Profile() string
 }
 
 type gpu struct {
-	cache *resourceCache
+	cache *textureCache
 
 	profile                                string
 	timers                                 *timers
@@ -73,7 +69,6 @@ type renderer struct {
 }
 
 type drawOps struct {
-	profile      bool
 	reader       ops.Reader
 	states       []f32.Affine2D
 	transStack   []f32.Affine2D
@@ -359,7 +354,7 @@ func NewWithDevice(d driver.Device) (GPU, error) {
 
 func newGPU(ctx driver.Device) (*gpu, error) {
 	g := &gpu{
-		cache: newResourceCache(),
+		cache: newTextureCache(),
 	}
 	g.drawOps.pathCache = newOpCache()
 	if err := g.init(ctx); err != nil {
@@ -399,7 +394,7 @@ func (g *gpu) collect(viewport image.Point, frameOps *op.Ops) {
 	g.renderer.pather.viewport = viewport
 	g.drawOps.reset(viewport)
 	g.drawOps.collect(frameOps, viewport)
-	if g.drawOps.profile && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
+	if false && g.timers == nil && g.ctx.Caps().Features.Has(driver.FeatureTimers) {
 		g.frameStart = time.Now()
 		g.timers = newTimers(g.ctx)
 		g.stencilTimer = g.timers.newTimer()
@@ -425,9 +420,9 @@ func (g *gpu) frame(target RenderTarget) error {
 	g.stencilTimer.end()
 	g.coverTimer.begin()
 	g.renderer.uploadImages(g.cache, g.drawOps.imageOps)
-	g.renderer.prepareDrawOps(g.cache, g.drawOps.imageOps)
+	g.renderer.prepareDrawOps(g.drawOps.imageOps)
 	g.drawOps.layers = g.renderer.packLayers(g.drawOps.layers)
-	g.renderer.drawLayers(g.cache, g.drawOps.layers, g.drawOps.imageOps)
+	g.renderer.drawLayers(g.drawOps.layers, g.drawOps.imageOps)
 	d := driver.LoadDesc{
 		ClearColor: g.drawOps.clearColor,
 	}
@@ -437,14 +432,14 @@ func (g *gpu) frame(target RenderTarget) error {
 	}
 	g.ctx.BeginRenderPass(defFBO, d)
 	g.ctx.Viewport(0, 0, viewport.X, viewport.Y)
-	g.renderer.drawOps(g.cache, false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
+	g.renderer.drawOps(false, image.Point{}, g.renderer.blitter.viewport, g.drawOps.imageOps)
 	g.coverTimer.end()
 	g.ctx.EndRenderPass()
 	g.cleanupTimer.begin()
 	g.cache.frame()
 	g.drawOps.pathCache.frame()
 	g.cleanupTimer.end()
-	if g.drawOps.profile && g.timers.ready() {
+	if false && g.timers.ready() {
 		st, covt, cleant := g.stencilTimer.Elapsed, g.coverTimer.Elapsed, g.cleanupTimer.Elapsed
 		ft := st + covt + cleant
 		q := 100 * time.Microsecond
@@ -460,12 +455,8 @@ func (g *gpu) Profile() string {
 	return g.profile
 }
 
-func (r *renderer) texHandle(cache *resourceCache, data imageOpData) driver.Texture {
-	type cachekey struct {
-		filter byte
-		handle any
-	}
-	key := cachekey{
+func (r *renderer) texHandle(cache *textureCache, data imageOpData) driver.Texture {
+	key := textureCacheKey{
 		filter: data.filter,
 		handle: data.handle,
 	}
@@ -853,7 +844,7 @@ func (r *renderer) packLayers(layers []opacityLayer) []opacityLayer {
 	return layers
 }
 
-func (r *renderer) drawLayers(cache *resourceCache, layers []opacityLayer, ops []imageOp) {
+func (r *renderer) drawLayers(layers []opacityLayer, ops []imageOp) {
 	if len(r.layers.sizes) == 0 {
 		return
 	}
@@ -876,7 +867,7 @@ func (r *renderer) drawLayers(cache *resourceCache, layers []opacityLayer, ops [
 		}
 		r.ctx.Viewport(v.Min.X, v.Min.Y, v.Max.X, v.Max.Y)
 		f := r.layerFBOs.fbos[fbo]
-		r.drawOps(cache, true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
+		r.drawOps(true, l.clip.Min.Mul(-1), l.clip.Size(), ops[l.opStart:l.opEnd])
 		sr := f32.FRect(v)
 		uvScale, uvOffset := texSpaceTransform(sr, f.size)
 		uvTrans := f32.Affine2D{}.Scale(f32.Point{}, uvScale).Offset(uvOffset)
@@ -899,7 +890,6 @@ func (r *renderer) drawLayers(cache *resourceCache, layers []opacityLayer, ops [
 }
 
 func (d *drawOps) reset(viewport image.Point) {
-	d.profile = false
 	d.viewport = viewport
 	d.imageOps = d.imageOps[:0]
 	d.pathOps = d.pathOps[:0]
@@ -993,8 +983,6 @@ func (d *drawOps) collectOps(r *ops.Reader, viewport f32.Rectangle) {
 loop:
 	for encOp, ok := r.Decode(); ok; encOp, ok = r.Decode() {
 		switch ops.OpType(encOp.Data[0]) {
-		case ops.TypeProfile:
-			d.profile = true
 		case ops.TypeTransform:
 			dop, push := ops.DecodeTransform(encOp.Data)
 			if push {
@@ -1211,7 +1199,7 @@ func (d *drawState) materialFor(rect f32.Rectangle, off f32.Point, partTrans f32
 	return m
 }
 
-func (r *renderer) uploadImages(cache *resourceCache, ops []imageOp) {
+func (r *renderer) uploadImages(cache *textureCache, ops []imageOp) {
 	for i := range ops {
 		img := &ops[i]
 		m := img.material
@@ -1221,7 +1209,7 @@ func (r *renderer) uploadImages(cache *resourceCache, ops []imageOp) {
 	}
 }
 
-func (r *renderer) prepareDrawOps(cache *resourceCache, ops []imageOp) {
+func (r *renderer) prepareDrawOps(ops []imageOp) {
 	for _, img := range ops {
 		m := img.material
 		switch m.material {
@@ -1242,7 +1230,7 @@ func (r *renderer) prepareDrawOps(cache *resourceCache, ops []imageOp) {
 	}
 }
 
-func (r *renderer) drawOps(cache *resourceCache, isFBO bool, opOff image.Point, viewport image.Point, ops []imageOp) {
+func (r *renderer) drawOps(isFBO bool, opOff image.Point, viewport image.Point, ops []imageOp) {
 	var coverTex driver.Texture
 	for i := 0; i < len(ops); i++ {
 		img := ops[i]

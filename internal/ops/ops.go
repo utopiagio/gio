@@ -55,28 +55,19 @@ const (
 	TypePopTransform
 	TypePushOpacity
 	TypePopOpacity
-	TypeInvalidate
 	TypeImage
 	TypePaint
 	TypeColor
 	TypeLinearGradient
 	TypePass
 	TypePopPass
-	TypePointerInput
-	TypeClipboardRead
-	TypeClipboardWrite
-	TypeSource
-	TypeTarget
-	TypeOffer
-	TypeKeyInput
-	TypeKeyFocus
-	TypeKeySoftKeyboard
+	TypeInput
+	TypeKeyInputHint
 	TypeSave
 	TypeLoad
 	TypeAux
 	TypeClip
 	TypePopClip
-	TypeProfile
 	TypeCursor
 	TypePath
 	TypeStroke
@@ -85,8 +76,6 @@ const (
 	TypeSemanticClass
 	TypeSemanticSelected
 	TypeSemanticEnabled
-	TypeSnippet
-	TypeSelection
 	TypeActionInput
 )
 
@@ -148,21 +137,13 @@ const (
 	TypeLinearGradientLen   = 1 + 8*2 + 4*2
 	TypePassLen             = 1
 	TypePopPassLen          = 1
-	TypePointerInputLen     = 1 + 1 + 1*2 + 2*4 + 2*4
-	TypeClipboardReadLen    = 1
-	TypeClipboardWriteLen   = 1
-	TypeSourceLen           = 1
-	TypeTargetLen           = 1
-	TypeOfferLen            = 1
-	TypeKeyInputLen         = 1 + 1
-	TypeKeyFocusLen         = 1 + 1
-	TypeKeySoftKeyboardLen  = 1 + 1
+	TypeInputLen            = 1
+	TypeKeyInputHintLen     = 1 + 1
 	TypeSaveLen             = 1 + 4
 	TypeLoadLen             = 1 + 4
 	TypeAuxLen              = 1
 	TypeClipLen             = 1 + 4*4 + 1 + 1
 	TypePopClipLen          = 1
-	TypeProfileLen          = 1
 	TypeCursorLen           = 2
 	TypePathLen             = 8 + 1
 	TypeStrokeLen           = 1 + 4
@@ -171,8 +152,6 @@ const (
 	TypeSemanticClassLen    = 2
 	TypeSemanticSelectedLen = 2
 	TypeSemanticEnabledLen  = 2
-	TypeSnippetLen          = 1 + 4 + 4
-	TypeSelectionLen        = 1 + 2*4 + 2*4 + 4 + 4
 	TypeActionInputLen      = 1 + 1
 )
 
@@ -425,28 +404,19 @@ var opProps = [0x100]opProp{
 	TypePopTransform:     {Size: TypePopTransformLen, NumRefs: 0},
 	TypePushOpacity:      {Size: TypePushOpacityLen, NumRefs: 0},
 	TypePopOpacity:       {Size: TypePopOpacityLen, NumRefs: 0},
-	TypeInvalidate:       {Size: TypeRedrawLen, NumRefs: 0},
 	TypeImage:            {Size: TypeImageLen, NumRefs: 2},
 	TypePaint:            {Size: TypePaintLen, NumRefs: 0},
 	TypeColor:            {Size: TypeColorLen, NumRefs: 0},
 	TypeLinearGradient:   {Size: TypeLinearGradientLen, NumRefs: 0},
 	TypePass:             {Size: TypePassLen, NumRefs: 0},
 	TypePopPass:          {Size: TypePopPassLen, NumRefs: 0},
-	TypePointerInput:     {Size: TypePointerInputLen, NumRefs: 1},
-	TypeClipboardRead:    {Size: TypeClipboardReadLen, NumRefs: 1},
-	TypeClipboardWrite:   {Size: TypeClipboardWriteLen, NumRefs: 1},
-	TypeSource:           {Size: TypeSourceLen, NumRefs: 2},
-	TypeTarget:           {Size: TypeTargetLen, NumRefs: 2},
-	TypeOffer:            {Size: TypeOfferLen, NumRefs: 3},
-	TypeKeyInput:         {Size: TypeKeyInputLen, NumRefs: 2},
-	TypeKeyFocus:         {Size: TypeKeyFocusLen, NumRefs: 1},
-	TypeKeySoftKeyboard:  {Size: TypeKeySoftKeyboardLen, NumRefs: 0},
+	TypeInput:            {Size: TypeInputLen, NumRefs: 1},
+	TypeKeyInputHint:     {Size: TypeKeyInputHintLen, NumRefs: 1},
 	TypeSave:             {Size: TypeSaveLen, NumRefs: 0},
 	TypeLoad:             {Size: TypeLoadLen, NumRefs: 0},
 	TypeAux:              {Size: TypeAuxLen, NumRefs: 0},
 	TypeClip:             {Size: TypeClipLen, NumRefs: 0},
 	TypePopClip:          {Size: TypePopClipLen, NumRefs: 0},
-	TypeProfile:          {Size: TypeProfileLen, NumRefs: 1},
 	TypeCursor:           {Size: TypeCursorLen, NumRefs: 0},
 	TypePath:             {Size: TypePathLen, NumRefs: 0},
 	TypeStroke:           {Size: TypeStrokeLen, NumRefs: 0},
@@ -455,8 +425,6 @@ var opProps = [0x100]opProp{
 	TypeSemanticClass:    {Size: TypeSemanticClassLen, NumRefs: 0},
 	TypeSemanticSelected: {Size: TypeSemanticSelectedLen, NumRefs: 0},
 	TypeSemanticEnabled:  {Size: TypeSemanticEnabledLen, NumRefs: 0},
-	TypeSnippet:          {Size: TypeSnippetLen, NumRefs: 2},
-	TypeSelection:        {Size: TypeSelectionLen, NumRefs: 1},
 	TypeActionInput:      {Size: TypeActionInputLen, NumRefs: 0},
 }
 
@@ -489,8 +457,6 @@ func (t OpType) String() string {
 		return "PushOpacity"
 	case TypePopOpacity:
 		return "PopOpacity"
-	case TypeInvalidate:
-		return "Invalidate"
 	case TypeImage:
 		return "Image"
 	case TypePaint:
@@ -503,24 +469,10 @@ func (t OpType) String() string {
 		return "Pass"
 	case TypePopPass:
 		return "PopPass"
-	case TypePointerInput:
-		return "PointerInput"
-	case TypeClipboardRead:
-		return "ClipboardRead"
-	case TypeClipboardWrite:
-		return "ClipboardWrite"
-	case TypeSource:
-		return "Source"
-	case TypeTarget:
-		return "Target"
-	case TypeOffer:
-		return "Offer"
-	case TypeKeyInput:
-		return "KeyInput"
-	case TypeKeyFocus:
-		return "KeyFocus"
-	case TypeKeySoftKeyboard:
-		return "KeySoftKeyboard"
+	case TypeInput:
+		return "Input"
+	case TypeKeyInputHint:
+		return "KeyInputHint"
 	case TypeSave:
 		return "Save"
 	case TypeLoad:
@@ -531,8 +483,6 @@ func (t OpType) String() string {
 		return "Clip"
 	case TypePopClip:
 		return "PopClip"
-	case TypeProfile:
-		return "Profile"
 	case TypeCursor:
 		return "Cursor"
 	case TypePath:

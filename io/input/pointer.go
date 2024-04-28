@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Unlicense OR MIT
 
-package router
+package input
 
 import (
 	"image"
@@ -10,7 +10,6 @@ import (
 	f32internal "github.com/utopiagio/gio/internal/f32"
 	"github.com/utopiagio/gio/internal/ops"
 	"github.com/utopiagio/gio/io/event"
-	"github.com/utopiagio/gio/io/key"
 	"github.com/utopiagio/gio/io/pointer"
 	"github.com/utopiagio/gio/io/semantic"
 	"github.com/utopiagio/gio/io/system"
@@ -18,14 +17,8 @@ import (
 )
 
 type pointerQueue struct {
-	hitTree   []hitNode
-	areas     []areaNode
-	cursor    pointer.Cursor
-	handlers  map[event.Tag]*pointerHandler
-	pointers  []pointerInfo
-	transfers []io.ReadCloser // pending data transfers
-
-	scratch []event.Tag
+	hitTree []hitNode
+	areas   []areaNode
 
 	semantic struct {
 		idsAssigned bool
@@ -43,8 +36,13 @@ type hitNode struct {
 
 	// For handler nodes.
 	tag  event.Tag
-	ktag event.Tag
 	pass bool
+}
+
+// pointerState is the input state related to pointer events.
+type pointerState struct {
+	cursor   pointer.Cursor
+	pointers []pointerInfo
 }
 
 type pointerInfo struct {
@@ -63,17 +61,21 @@ type pointerInfo struct {
 }
 
 type pointerHandler struct {
-	area      int
-	active    bool
-	wantsGrab bool
-	types     pointer.Kind
+	// areaPlusOne is the index into the list of pointerQueue.areas, plus 1.
+	areaPlusOne int
+	// setup tracks whether the handler has received
+	// the pointer.Cancel event that resets its state.
+	setup bool
+}
+
+// pointerFilter represents the union of a set of pointer filters.
+type pointerFilter struct {
+	kinds pointer.Kind
 	// min and max horizontal/vertical scroll
 	scrollRange image.Rectangle
 
 	sourceMimes []string
 	targetMimes []string
-	offeredMime string
-	data        io.ReadCloser
 }
 
 type areaOp struct {
@@ -229,33 +231,18 @@ func (c *pointerCollector) addHitNode(n hitNode) {
 }
 
 // newHandler returns the current handler or a new one for tag.
-func (c *pointerCollector) newHandler(tag event.Tag, events *handlerEvents) *pointerHandler {
+func (c *pointerCollector) newHandler(tag event.Tag, state *pointerHandler) {
 	areaID := c.currentArea()
 	c.addHitNode(hitNode{
 		area: areaID,
 		tag:  tag,
 		pass: c.state.pass > 0,
 	})
-	h, ok := c.q.handlers[tag]
-	if !ok {
-		h = new(pointerHandler)
-		c.q.handlers[tag] = h
-		// Cancel handlers on (each) first appearance, but don't
-		// trigger redraw.
-		events.AddNoRedraw(tag, pointer.Event{Kind: pointer.Cancel})
-	}
-	h.active = true
-	h.area = areaID
-	return h
+	state.areaPlusOne = areaID + 1
 }
 
-func (c *pointerCollector) keyInputOp(op key.InputOp) {
-	areaID := c.currentArea()
-	c.addHitNode(hitNode{
-		area: areaID,
-		ktag: op.Tag,
-		pass: true,
-	})
+func (s *pointerHandler) Reset() {
+	s.areaPlusOne = 0
 }
 
 func (c *pointerCollector) actionInputOp(act system.Action) {
@@ -264,21 +251,109 @@ func (c *pointerCollector) actionInputOp(act system.Action) {
 	area.action = act
 }
 
-func (c *pointerCollector) inputOp(op pointer.InputOp, events *handlerEvents) {
+func (q *pointerQueue) grab(state pointerState, req pointer.GrabCmd) (pointerState, []taggedEvent) {
+	var evts []taggedEvent
+	for _, p := range state.pointers {
+		if !p.pressed || p.id != req.ID {
+			continue
+		}
+		// Drop other handlers that lost their grab.
+		for i := len(p.handlers) - 1; i >= 0; i-- {
+			if tag := p.handlers[i]; tag != req.Tag {
+				evts = append(evts, taggedEvent{
+					tag:   tag,
+					event: pointer.Event{Kind: pointer.Cancel},
+				})
+				state = dropHandler(state, tag)
+			}
+		}
+		break
+	}
+	return state, evts
+}
+
+func (c *pointerCollector) inputOp(tag event.Tag, state *pointerHandler) {
 	areaID := c.currentArea()
 	area := &c.q.areas[areaID]
-	area.semantic.content.tag = op.Tag
-	if op.Kinds&(pointer.Press|pointer.Release) != 0 {
-		area.semantic.content.gestures |= ClickGesture
+	area.semantic.content.tag = tag
+	c.newHandler(tag, state)
+}
+
+func (p *pointerFilter) Add(f event.Filter) {
+	switch f := f.(type) {
+	case transfer.SourceFilter:
+		for _, m := range p.sourceMimes {
+			if m == f.Type {
+				return
+			}
+		}
+		p.sourceMimes = append(p.sourceMimes, f.Type)
+	case transfer.TargetFilter:
+		for _, m := range p.targetMimes {
+			if m == f.Type {
+				return
+			}
+		}
+		p.targetMimes = append(p.targetMimes, f.Type)
+	case pointer.Filter:
+		p.kinds = p.kinds | f.Kinds
+		p.scrollRange = p.scrollRange.Union(f.ScrollBounds)
 	}
-	if op.Kinds&pointer.Scroll != 0 {
-		area.semantic.content.gestures |= ScrollGesture
+}
+
+func (p *pointerFilter) Matches(e event.Event) bool {
+	switch e := e.(type) {
+	case pointer.Event:
+		return e.Kind&p.kinds == e.Kind
+	case transfer.CancelEvent, transfer.InitiateEvent:
+		return len(p.sourceMimes) > 0 || len(p.targetMimes) > 0
+	case transfer.RequestEvent:
+		for _, t := range p.sourceMimes {
+			if t == e.Type {
+				return true
+			}
+		}
+	case transfer.DataEvent:
+		for _, t := range p.targetMimes {
+			if t == e.Type {
+				return true
+			}
+		}
 	}
-	area.semantic.valid = area.semantic.content.gestures != 0
-	h := c.newHandler(op.Tag, events)
-	h.wantsGrab = h.wantsGrab || op.Grab
-	h.types = h.types | op.Kinds
-	h.scrollRange = op.ScrollBounds
+	return false
+}
+
+func (p *pointerFilter) Merge(p2 pointerFilter) {
+	p.kinds = p.kinds | p2.kinds
+	p.scrollRange = p.scrollRange.Union(p2.scrollRange)
+	p.sourceMimes = append(p.sourceMimes, p2.sourceMimes...)
+	p.targetMimes = append(p.targetMimes, p2.targetMimes...)
+}
+
+// clampScroll splits a scroll distance in the remaining scroll and the
+// scroll accepted by the filter.
+func (p *pointerFilter) clampScroll(scroll f32.Point) (left, scrolled f32.Point) {
+	left.X, scrolled.X = clampSplit(scroll.X, p.scrollRange.Min.X, p.scrollRange.Max.X)
+	left.Y, scrolled.Y = clampSplit(scroll.Y, p.scrollRange.Min.Y, p.scrollRange.Max.Y)
+	return
+}
+
+func clampSplit(v float32, min, max int) (float32, float32) {
+	if m := float32(max); v > m {
+		return v - m, m
+	}
+	if m := float32(min); v < m {
+		return v - m, m
+	}
+	return 0, v
+}
+
+func (s *pointerHandler) ResetEvent() (event.Event, bool) {
+	if s.setup {
+		return nil, false
+	}
+	s.setup = true
+	return pointer.Event{Kind: pointer.Cancel}, true
 }
 
 func (c *pointerCollector) semanticLabel(lbl string) {
@@ -322,23 +397,28 @@ func (c *pointerCollector) cursor(cursor pointer.Cursor) {
 	area.cursor = cursor
 }
 
-func (c *pointerCollector) sourceOp(op transfer.SourceOp, events *handlerEvents) {
-	h := c.newHandler(op.Tag, events)
-	h.sourceMimes = append(h.sourceMimes, op.Type)
+func (q *pointerQueue) offerData(handlers map[event.Tag]*handler, state pointerState, req transfer.OfferCmd) (pointerState, []taggedEvent) {
+	var evts []taggedEvent
+	for i, p := range state.pointers {
+		if p.dataSource != req.Tag {
+			continue
+		}
+		if p.dataTarget != nil {
+			evts = append(evts, taggedEvent{tag: p.dataTarget, event: transfer.DataEvent{
+				Type: req.Type,
+				Open: func() io.ReadCloser {
+					return req.Data
+				},
+			}})
+		}
+		state.pointers = append([]pointerInfo{}, state.pointers...)
+		state.pointers[i], evts = q.deliverTransferCancelEvent(handlers, p, evts)
+		break
+	}
+	return state, evts
 }
 
-func (c *pointerCollector) targetOp(op transfer.TargetOp, events *handlerEvents) {
-	h := c.newHandler(op.Tag, events)
-	h.targetMimes = append(h.targetMimes, op.Type)
-}
-
-func (c *pointerCollector) offerOp(op transfer.OfferOp, events *handlerEvents) {
-	h := c.newHandler(op.Tag, events)
-	h.offeredMime = op.Type
-	h.data = op.Data
-}
-
-func (c *pointerCollector) reset() {
+func (c *pointerCollector) Reset() {
 	c.q.reset()
 	c.resetState()
 	c.ensureRoot()
@@ -493,20 +573,6 @@ func (q *pointerQueue) hitTest(pos f32.Point, onNode func(*hitNode) bool) pointe
 	return cursor
 }
 
-func (q *pointerQueue) opHit(pos f32.Point) ([]event.Tag, pointer.Cursor) {
-	hits := q.scratch[:0]
-	cursor := q.hitTest(pos, func(n *hitNode) bool {
-		if n.tag != nil {
-			if _, exists := q.handlers[n.tag]; exists {
-				hits = addHandler(hits, n.tag)
-			}
-		}
-		return true
-	})
-	q.scratch = hits[:0]
-	return hits, cursor
-}
-
 func (q *pointerQueue) invTransform(areaIdx int, p f32.Point) f32.Point {
 	if areaIdx == -1 {
 		return p
@@ -531,17 +597,6 @@ func (q *pointerQueue) hit(areaIdx int, p f32.Point) (bool, pointer.Cursor) {
 }
 
 func (q *pointerQueue) reset() {
-	if q.handlers == nil {
-		q.handlers = make(map[event.Tag]*pointerHandler)
-	}
-	for _, h := range q.handlers {
-		// Reset handler.
-		h.active = false
-		h.wantsGrab = false
-		h.types = 0
-		h.sourceMimes = h.sourceMimes[:0]
-		h.targetMimes = h.targetMimes[:0]
-	}
 	q.hitTree = q.hitTree[:0]
 	q.areas = q.areas[:0]
 	q.semantic.idsAssigned = false
@@ -559,80 +614,71 @@ func (q *pointerQueue) reset() {
 			delete(q.semantic.contentIDs, k)
 		}
 	}
-	for _, rc := range q.transfers {
-		if rc != nil {
-			rc.Close()
-		}
-	}
-	q.transfers = nil
 }
 
-func (q *pointerQueue) Frame(events *handlerEvents) {
-	for k, h := range q.handlers {
-		if !h.active {
-			q.dropHandler(nil, k)
-			delete(q.handlers, k)
-		}
-		if h.wantsGrab {
-			for _, p := range q.pointers {
-				if !p.pressed {
-					continue
-				}
-				for i, k2 := range p.handlers {
-					if k2 == k {
-						// Drop other handlers that lost their grab.
-						dropped := q.scratch[:0]
-						dropped = append(dropped, p.handlers[:i]...)
-						dropped = append(dropped, p.handlers[i+1:]...)
-						for _, tag := range dropped {
-							q.dropHandler(events, tag)
-						}
-						break
-					}
-				}
+func (q *pointerQueue) Frame(handlers map[event.Tag]*handler, state pointerState) (pointerState, []taggedEvent) {
+	for _, h := range handlers {
+		if h.pointer.areaPlusOne != 0 {
+			area := &q.areas[h.pointer.areaPlusOne-1]
+			if h.filter.pointer.kinds&(pointer.Press|pointer.Release) != 0 {
+				area.semantic.content.gestures |= ClickGesture
 			}
+			if h.filter.pointer.kinds&pointer.Scroll != 0 {
+				area.semantic.content.gestures |= ScrollGesture
+			}
+			area.semantic.valid = area.semantic.content.gestures != 0
 		}
 	}
-	for i := range q.pointers {
-		p := &q.pointers[i]
-		q.deliverEnterLeaveEvents(p, events, p.last)
-		q.deliverTransferDataEvent(p, events)
+	var evts []taggedEvent
+	for i, p := range state.pointers {
+		changed := false
+		p, evts, state.cursor, changed = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, p.last)
+		if changed {
+			state.pointers = append([]pointerInfo{}, state.pointers...)
+			state.pointers[i] = p
+		}
 	}
+	return state, evts
 }
 
-func (q *pointerQueue) dropHandler(events *handlerEvents, tag event.Tag) {
-	if events != nil {
-		events.Add(tag, pointer.Event{Kind: pointer.Cancel})
-	}
-	for i := range q.pointers {
-		p := &q.pointers[i]
-		for i := len(p.handlers) - 1; i >= 0; i-- {
-			if p.handlers[i] == tag {
-				p.handlers = append(p.handlers[:i], p.handlers[i+1:]...)
+func dropHandler(state pointerState, tag event.Tag) pointerState {
+	pointers := state.pointers
+	state.pointers = nil
+	for _, p := range pointers {
+		handlers := p.handlers
+		p.handlers = nil
+		for _, h := range handlers {
+			if h != tag {
+				p.handlers = append(p.handlers, h)
 			}
 		}
-		for i := len(p.entered) - 1; i >= 0; i-- {
-			if p.entered[i] == tag {
-				p.entered = append(p.entered[:i], p.entered[i+1:]...)
+		entered := p.entered
+		p.entered = nil
+		for _, h := range entered {
+			if h != tag {
+				p.entered = append(p.entered, h)
 			}
 		}
+		state.pointers = append(state.pointers, p)
 	}
+	return state
 }
 
 // pointerOf returns the pointerInfo index corresponding to the pointer in e.
-func (q *pointerQueue) pointerOf(e pointer.Event) int {
-	for i, p := range q.pointers {
+func (s pointerState) pointerOf(e pointer.Event) (pointerState, int) {
+	for i, p := range s.pointers {
 		if p.id == e.PointerID {
-			return i
+			return s, i
 		}
 	}
-	q.pointers = append(q.pointers, pointerInfo{id: e.PointerID})
-	return len(q.pointers) - 1
+	n := len(s.pointers)
+	s.pointers = append(s.pointers[:n:n], pointerInfo{id: e.PointerID})
+	return s, len(s.pointers) - 1
 }
 
 // Deliver is like Push, but delivers an event to a particular area.
-func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEvents) {
-	var sx, sy = e.Scroll.X, e.Scroll.Y
+func (q *pointerQueue) Deliver(handlers map[event.Tag]*handler, areaIdx int, e pointer.Event) []taggedEvent {
+	scroll := e.Scroll
 	idx := len(q.hitTree) - 1
 	// Locate first potential receiver.
 	for idx != -1 {
@@ -642,31 +688,28 @@ func (q *pointerQueue) Deliver(areaIdx int, e pointer.Event, events *handlerEven
 		}
 		idx--
 	}
+	var evts []taggedEvent
 	for idx != -1 {
 		n := &q.hitTree[idx]
 		idx = n.next
-		if n.tag == nil {
-			continue
-		}
-		h := q.handlers[n.tag]
-		if e.Kind&h.types == 0 {
+		h, ok := handlers[n.tag]
+		if !ok || !h.filter.pointer.Matches(e) {
 			continue
 		}
 		e := e
 		if e.Kind == pointer.Scroll {
-			if sx == 0 && sy == 0 {
+			if scroll == (f32.Point{}) {
 				break
 			}
-			// Distribute the scroll to the handler based on its ScrollRange.
-			sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
-			sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
+			scroll, e.Scroll = h.filter.pointer.clampScroll(scroll)
 		}
-		e.Position = q.invTransform(h.area, e.Position)
-		events.Add(n.tag, e)
+		e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
+		evts = append(evts, taggedEvent{tag: n.tag, event: e})
 		if e.Kind != pointer.Scroll {
 			break
 		}
 	}
+	return evts
 }
 
 // SemanticArea returns the sematic content for area, and its parent area.
@@ -682,106 +725,129 @@ func (q *pointerQueue) SemanticArea(areaIdx int) (semanticContent, int) {
 	return semanticContent{}, -1
 }
 
-func (q *pointerQueue) Push(e pointer.Event, events *handlerEvents) {
+func (q *pointerQueue) Push(handlers map[event.Tag]*handler, state pointerState, e pointer.Event) (pointerState, []taggedEvent) {
+	var evts []taggedEvent
 	if e.Kind == pointer.Cancel {
-		q.pointers = q.pointers[:0]
-		for k := range q.handlers {
-			q.dropHandler(events, k)
+		for k := range handlers {
+			evts = append(evts, taggedEvent{
+				event: pointer.Event{Kind: pointer.Cancel},
+				tag:   k,
+			})
 		}
-		return
+		state.pointers = nil
+		return state, evts
 	}
-	pidx := q.pointerOf(e)
-	p := &q.pointers[pidx]
-	p.last = e
+	state, pidx := state.pointerOf(e)
+	p := state.pointers[pidx]
 
 	switch e.Kind {
 	case pointer.Press:
-		q.deliverEnterLeaveEvents(p, events, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
 		p.pressed = true
-		q.deliverEvent(p, events, e)
+		evts = q.deliverEvent(handlers, p, evts, e)
 	case pointer.Move:
 		if p.pressed {
 			e.Kind = pointer.Drag
 		}
-		q.deliverEnterLeaveEvents(p, events, e)
-		q.deliverEvent(p, events, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
+		evts = q.deliverEvent(handlers, p, evts, e)
 		if p.pressed {
-			q.deliverDragEvent(p, events)
+			p, evts = q.deliverDragEvent(handlers, p, evts)
 		}
 	case pointer.Release:
-		q.deliverEvent(p, events, e)
+		evts = q.deliverEvent(handlers, p, evts, e)
 		p.pressed = false
-		q.deliverEnterLeaveEvents(p, events, e)
-		q.deliverDropEvent(p, events)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
+		p, evts = q.deliverDropEvent(handlers, p, evts)
 	case pointer.Scroll:
-		q.deliverEnterLeaveEvents(p, events, e)
-		q.deliverEvent(p, events, e)
+		p, evts, state.cursor, _ = q.deliverEnterLeaveEvents(handlers, state.cursor, p, evts, e)
+		evts = q.deliverEvent(handlers, p, evts, e)
 	default:
 		panic("unsupported pointer event type")
 	}
 
+	p.last = e
+
 	if !p.pressed && len(p.entered) == 0 {
 		// No longer need to track pointer.
-		q.pointers = append(q.pointers[:pidx], q.pointers[pidx+1:]...)
+		state.pointers = append(state.pointers[:pidx:pidx], state.pointers[pidx+1:]...)
+	} else {
+		state.pointers = append([]pointerInfo{}, state.pointers...)
+		state.pointers[pidx] = p
 	}
+	return state, evts
 }
 
-func (q *pointerQueue) deliverEvent(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+func (q *pointerQueue) deliverEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent, e pointer.Event) []taggedEvent {
 	foremost := true
 	if p.pressed && len(p.handlers) == 1 {
 		e.Priority = pointer.Grabbed
 		foremost = false
 	}
-	var sx, sy = e.Scroll.X, e.Scroll.Y
+	scroll := e.Scroll
 	for _, k := range p.handlers {
-		h := q.handlers[k]
-		if e.Kind == pointer.Scroll {
-			if sx == 0 && sy == 0 {
-				return
-			}
-			// Distribute the scroll to the handler based on its ScrollRange.
-			sx, e.Scroll.X = setScrollEvent(sx, h.scrollRange.Min.X, h.scrollRange.Max.X)
-			sy, e.Scroll.Y = setScrollEvent(sy, h.scrollRange.Min.Y, h.scrollRange.Max.Y)
-		}
-		if e.Kind&h.types == 0 {
+		h, ok := handlers[k]
+		if !ok {
 			continue
+		}
+		f := h.filter.pointer
+		if !f.Matches(e) {
+			continue
+		}
+		if e.Kind == pointer.Scroll {
+			if scroll == (f32.Point{}) {
+				return evts
+			}
+			scroll, e.Scroll = f.clampScroll(scroll)
 		}
 		e := e
 		if foremost {
 			foremost = false
 			e.Priority = pointer.Foremost
 		}
-		e.Position = q.invTransform(h.area, e.Position)
-		events.Add(k, e)
+		e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
+		evts = append(evts, taggedEvent{event: e, tag: k})
 	}
+	return evts
 }
 
-func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEvents, e pointer.Event) {
+func (q *pointerQueue) deliverEnterLeaveEvents(handlers map[event.Tag]*handler, cursor pointer.Cursor, p pointerInfo, evts []taggedEvent, e pointer.Event) (pointerInfo, []taggedEvent, pointer.Cursor, bool) {
+	changed := false
 	var hits []event.Tag
 	if e.Source != pointer.Mouse && !p.pressed && e.Kind != pointer.Press {
 		// Consider non-mouse pointers leaving when they're released.
 	} else {
-		hits, q.cursor = q.opHit(e.Position)
-		if p.pressed {
-			// Filter out non-participating handlers,
-			// except potential transfer targets when a transfer has been initiated.
-			var hitsHaveTarget bool
-			if p.dataSource != nil {
-				transferSource := q.handlers[p.dataSource]
-				for _, hit := range hits {
-					if _, ok := firstMimeMatch(transferSource, q.handlers[hit]); ok {
-						hitsHaveTarget = true
-						break
+		var transSrc *pointerFilter
+		if p.dataSource != nil {
+			transSrc = &handlers[p.dataSource].filter.pointer
+		}
+		cursor = q.hitTest(e.Position, func(n *hitNode) bool {
+			h, ok := handlers[n.tag]
+			if !ok {
+				return true
+			}
+			add := true
+			if p.pressed {
+				add = false
+				// Filter out non-participating handlers,
+				// except potential transfer targets when a transfer has been initiated.
+				if _, found := searchTag(p.handlers, n.tag); found {
+					add = true
+				}
+				if transSrc != nil {
+					if _, ok := firstMimeMatch(transSrc, &h.filter.pointer); ok {
+						add = true
 					}
 				}
 			}
-			for i := len(hits) - 1; i >= 0; i-- {
-				if _, found := searchTag(p.handlers, hits[i]); !found && !hitsHaveTarget {
-					hits = append(hits[:i], hits[i+1:]...)
-				}
+			if add {
+				hits = addHandler(hits, n.tag)
 			}
-		} else {
-			p.handlers = append(p.handlers[:0], hits...)
+			return true
+		})
+		if !p.pressed {
+			changed = true
+			p.handlers = hits
 		}
 	}
 	// Deliver Leave events.
@@ -789,111 +855,94 @@ func (q *pointerQueue) deliverEnterLeaveEvents(p *pointerInfo, events *handlerEv
 		if _, found := searchTag(hits, k); found {
 			continue
 		}
-		h := q.handlers[k]
+		h, ok := handlers[k]
+		if !ok {
+			continue
+		}
+		changed = true
+		e := e
 		e.Kind = pointer.Leave
 
-		if e.Kind&h.types != 0 {
-			e := e
-			e.Position = q.invTransform(h.area, e.Position)
-			events.Add(k, e)
+		if h.filter.pointer.Matches(e) {
+			e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
+			evts = append(evts, taggedEvent{tag: k, event: e})
 		}
 	}
 	// Deliver Enter events.
 	for _, k := range hits {
-		h := q.handlers[k]
 		if _, found := searchTag(p.entered, k); found {
 			continue
 		}
+		h, ok := handlers[k]
+		if !ok {
+			continue
+		}
+		changed = true
+		e := e
 		e.Kind = pointer.Enter
 
-		if e.Kind&h.types != 0 {
-			e := e
-			e.Position = q.invTransform(h.area, e.Position)
-			events.Add(k, e)
+		if h.filter.pointer.Matches(e) {
+			e.Position = q.invTransform(h.pointer.areaPlusOne-1, e.Position)
+			evts = append(evts, taggedEvent{tag: k, event: e})
 		}
 	}
-	p.entered = append(p.entered[:0], hits...)
+	p.entered = hits
+	return p, evts, cursor, changed
 }
 
-func (q *pointerQueue) deliverDragEvent(p *pointerInfo, events *handlerEvents) {
+func (q *pointerQueue) deliverDragEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
 	if p.dataSource != nil {
-		return
+		return p, evts
 	}
 	// Identify the data source.
 	for _, k := range p.entered {
-		src := q.handlers[k]
+		src := &handlers[k].filter.pointer
 		if len(src.sourceMimes) == 0 {
 			continue
 		}
 		// One data source handler per pointer.
 		p.dataSource = k
 		// Notify all potential targets.
-		for k, tgt := range q.handlers {
-			if _, ok := firstMimeMatch(src, tgt); ok {
-				events.Add(k, transfer.InitiateEvent{})
+		for k, tgt := range handlers {
+			if _, ok := firstMimeMatch(src, &tgt.filter.pointer); ok {
+				evts = append(evts, taggedEvent{tag: k, event: transfer.InitiateEvent{}})
 			}
 		}
 		break
 	}
+	return p, evts
 }
 
-func (q *pointerQueue) deliverDropEvent(p *pointerInfo, events *handlerEvents) {
+func (q *pointerQueue) deliverDropEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
 	if p.dataSource == nil {
-		return
+		return p, evts
 	}
 	// Request data from the source.
-	src := q.handlers[p.dataSource]
+	src := &handlers[p.dataSource].filter.pointer
 	for _, k := range p.entered {
-		h := q.handlers[k]
-		if m, ok := firstMimeMatch(src, h); ok {
+		h := handlers[k]
+		if m, ok := firstMimeMatch(src, &h.filter.pointer); ok {
 			p.dataTarget = k
-			events.Add(p.dataSource, transfer.RequestEvent{Type: m})
-			return
+			evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.RequestEvent{Type: m}})
+			return p, evts
 		}
 	}
 	// No valid target found, abort.
-	q.deliverTransferCancelEvent(p, events)
+	return q.deliverTransferCancelEvent(handlers, p, evts)
 }
 
-func (q *pointerQueue) deliverTransferDataEvent(p *pointerInfo, events *handlerEvents) {
-	if p.dataSource == nil {
-		return
-	}
-	src := q.handlers[p.dataSource]
-	if src.data == nil {
-		// Data not received yet.
-		return
-	}
-	if p.dataTarget == nil {
-		q.deliverTransferCancelEvent(p, events)
-		return
-	}
-	// Send the offered data to the target.
-	transferIdx := len(q.transfers)
-	events.Add(p.dataTarget, transfer.DataEvent{
-		Type: src.offeredMime,
-		Open: func() io.ReadCloser {
-			q.transfers[transferIdx] = nil
-			return src.data
-		},
-	})
-	q.transfers = append(q.transfers, src.data)
-	p.dataTarget = nil
-}
-
-func (q *pointerQueue) deliverTransferCancelEvent(p *pointerInfo, events *handlerEvents) {
-	events.Add(p.dataSource, transfer.CancelEvent{})
+func (q *pointerQueue) deliverTransferCancelEvent(handlers map[event.Tag]*handler, p pointerInfo, evts []taggedEvent) (pointerInfo, []taggedEvent) {
+	evts = append(evts, taggedEvent{tag: p.dataSource, event: transfer.CancelEvent{}})
 	// Cancel all potential targets.
-	src := q.handlers[p.dataSource]
-	for k, h := range q.handlers {
-		if _, ok := firstMimeMatch(src, h); ok {
-			events.Add(k, transfer.CancelEvent{})
+	src := &handlers[p.dataSource].filter.pointer
+	for k, h := range handlers {
+		if _, ok := firstMimeMatch(src, &h.filter.pointer); ok {
+			evts = append(evts, taggedEvent{tag: k, event: transfer.CancelEvent{}})
 		}
 	}
-	src.offeredMime = ""
-	src.data = nil
 	p.dataSource = nil
 	p.dataTarget = nil
+	return p, evts
 }
 
 // ClipFor clips r to the parents of area.
@@ -928,7 +977,7 @@ func addHandler(tags []event.Tag, tag event.Tag) []event.Tag {
 }
 
 // firstMimeMatch returns the first type match between src and tgt.
-func firstMimeMatch(src, tgt *pointerHandler) (first string, matched bool) {
+func firstMimeMatch(src, tgt *pointerFilter) (first string, matched bool) {
 	for _, m1 := range tgt.targetMimes {
 		for _, m2 := range src.sourceMimes {
 			if m1 == m2 {
@@ -964,14 +1013,4 @@ func (a *areaNode) bounds() image.Rectangle {
 		Min: a.trans.Transform(f32internal.FPt(a.area.rect.Min)),
 		Max: a.trans.Transform(f32internal.FPt(a.area.rect.Max)),
 	}.Round()
-}
-
-func setScrollEvent(scroll float32, min, max int) (left, scrolled float32) {
-	if v := float32(max); scroll > v {
-		return scroll - v, v
-	}
-	if v := float32(min); scroll < v {
-		return scroll - v, v
-	}
-	return 0, scroll
 }

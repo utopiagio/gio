@@ -9,8 +9,8 @@ import (
 
 	"github.com/utopiagio/gio/f32"
 	"github.com/utopiagio/gio/io/event"
+	"github.com/utopiagio/gio/io/input"
 	"github.com/utopiagio/gio/io/pointer"
-	"github.com/utopiagio/gio/io/router"
 	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/op/clip"
 )
@@ -22,20 +22,21 @@ func TestHover(t *testing.T) {
 	stack := clip.Rect(rect).Push(ops)
 	h.Add(ops)
 	stack.Pop()
-	r := new(router.Router)
+	r := new(input.Router)
+	h.Update(r.Source())
 	r.Frame(ops)
 
 	r.Queue(
 		pointer.Event{Kind: pointer.Move, Position: f32.Pt(30, 30)},
 	)
-	if !h.Update(r) {
+	if !h.Update(r.Source()) {
 		t.Fatal("expected hovered")
 	}
 
 	r.Queue(
 		pointer.Event{Kind: pointer.Move, Position: f32.Pt(50, 50)},
 	)
-	if h.Update(r) {
+	if h.Update(r.Source()) {
 		t.Fatal("expected not hovered")
 	}
 }
@@ -71,12 +72,21 @@ func TestMouseClicks(t *testing.T) {
 			var ops op.Ops
 			click.Add(&ops)
 
-			var r router.Router
+			var r input.Router
+			click.Update(r.Source())
 			r.Frame(&ops)
 			r.Queue(tc.events...)
 
-			events := click.Update(&r)
-			clicks := filterMouseClicks(events)
+			var clicks []ClickEvent
+			for {
+				ev, ok := click.Update(r.Source())
+				if !ok {
+					break
+				}
+				if ev.Kind == KindClick {
+					clicks = append(clicks, ev)
+				}
+			}
 			if got, want := len(clicks), len(tc.clicks); got != want {
 				t.Fatalf("got %d mouse clicks, expected %d", got, want)
 			}
@@ -105,14 +115,4 @@ func mouseClickEvents(times ...time.Duration) []event.Event {
 		events = append(events, press, release)
 	}
 	return events
-}
-
-func filterMouseClicks(events []ClickEvent) []ClickEvent {
-	var clicks []ClickEvent
-	for _, ev := range events {
-		if ev.Kind == KindClick {
-			clicks = append(clicks, ev)
-		}
-	}
-	return clicks
 }

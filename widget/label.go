@@ -5,7 +5,8 @@ package widget
 import (
 	"image"
 
-
+	"github.com/utopiagio/gio/f32"
+	"github.com/utopiagio/gio/font"
 	"github.com/utopiagio/gio/io/semantic"
 	"github.com/utopiagio/gio/layout"
 	"github.com/utopiagio/gio/op"
@@ -13,17 +14,7 @@ import (
 	"github.com/utopiagio/gio/op/paint"
 	"github.com/utopiagio/gio/text"
 	"github.com/utopiagio/gio/unit"
-
-	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/io/semantic"
-	//"gioui.org/layout"
-	//"gioui.org/op"
-	//"gioui.org/op/clip"
-	//"gioui.org/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-
+	
 	"golang.org/x/image/math/fixed"
 )
 
@@ -104,10 +95,6 @@ func (l Label) LayoutDetailed(gtx layout.Context, lt *text.Shaper, font font.Fon
 	dims.Baseline = dims.Size.Y - it.baseline
 	clipStack.Pop()
 	return dims, TextInfo{Truncated: it.truncated}
-}
-
-func r2p(r clip.Rect) clip.Op {
-	return clip.Stroke{Path: r.Path(), Width: 1}.Op()
 }
 
 // textIterator computes the bounding box of and paints text.

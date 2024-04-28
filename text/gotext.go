@@ -22,17 +22,12 @@ import (
 	"golang.org/x/text/unicode/bidi"
 
 	"github.com/utopiagio/gio/f32"
-	"github.com/utopiagio/gio/io/system"
-	"github.com/utopiagio/gio/op"
-	"github.com/utopiagio/gio/op/clip"
-
-	//"gioui.org/f32"
 	giofont "github.com/utopiagio/gio/font"
 	"github.com/utopiagio/gio/font/opentype"
 	"github.com/utopiagio/gio/internal/debug"
-	//"github.com/utopiagio/gio/io/system"
-	//"github.com/utopiagio/gio/op"
-	//"github.com/utopiagio/gio/op/clip"
+	"github.com/utopiagio/gio/io/system"
+	"github.com/utopiagio/gio/op"
+	"github.com/utopiagio/gio/op/clip"
 	"github.com/utopiagio/gio/op/paint"
 )
 
@@ -282,9 +277,8 @@ func newShaperImpl(systemFonts bool, collection []FontFace) *shaperImpl {
 // It returns whether the face is now available for use. FontFaces are prioritized
 // in the order in which they are loaded, with the first face being the default.
 func (s *shaperImpl) Load(f FontFace) {
-	md := opentype.FontToDescription(f.Font)
-	location := fontscan.Location{File: fmt.Sprint(md)}
-	s.fontMap.AddFace(f.Face.Face(), location, md)
+	desc := opentype.FontToDescription(f.Font)
+	s.fontMap.AddFace(f.Face.Face(), fontscan.Location{File: fmt.Sprint(desc)}, desc)
 	s.addFace(f.Face.Face(), f.Font)
 }
 

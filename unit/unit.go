@@ -67,7 +67,7 @@ func (c Metric) PxToSp(v int) Sp {
 
 // PxToDp converts v px to dp.
 func (c Metric) PxToDp(v int) Dp {
-	return Dp(float32(v) / nonZero(c.PxPerDp))
+	return Dp((float32(v) / nonZero(c.PxPerDp)) + 0.5)
 }
 
 func nonZero(v float32) float32 {

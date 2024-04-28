@@ -5,21 +5,14 @@ package material
 import (
 	"image/color"
 
+	"github.com/utopiagio/gio/font"
 	"github.com/utopiagio/gio/internal/f32color"
 	"github.com/utopiagio/gio/layout"
+	"github.com/utopiagio/gio/op"
 	"github.com/utopiagio/gio/op/paint"
 	"github.com/utopiagio/gio/text"
 	"github.com/utopiagio/gio/unit"
 	"github.com/utopiagio/gio/widget"
-
-	"github.com/utopiagio/gio/font"
-	//"gioui.org/internal/f32color"
-	//"gioui.org/layout"
-	"github.com/utopiagio/gio/op"
-	//"gioui.org/op/paint"
-	//"gioui.org/text"
-	//"gioui.org/unit"
-	//"gioui.org/widget"
 )
 
 // LabelStyle configures the presentation of text. If the State field is set, the
